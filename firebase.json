@@ -1,0 +1,36 @@
+{
+  "hosting": {
+    "public": "Y", // Tu directorio público donde están index.html, frontend.js, logo.jpg
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [ // <-- ESTE ES EL BLOQUE AÑADIDO/ASEGURADO
+      {
+        "source": "/procesarArchivo",
+        "function": "procesarArchivoAPI" // CAMBIA "procesarArchivoAPI" por el nombre real de tu función
+      },
+      {
+        "source": "/registrar-clasificacion-final",
+        "function": "registrarClasificacionFinalAPI" // CAMBIA "registrarClasificacionFinalAPI" por el nombre real de tu función
+      }
+    ]
+  },
+  "functions": [
+    {
+      "source": "functions", // Esto coincide con tu carpeta de funciones
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run lint" // Tu script de predeploy es una buena práctica
+      ]
+    }
+  ]
+}

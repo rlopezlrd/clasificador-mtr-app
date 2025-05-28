@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clasificador MTR Aduax</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="icon" href="https://i.imgur.com/TU8A5u9.png" type="image/png">
+
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+            font-size: 0.9rem;
+            background-color: #f9fafb;
+        }
+        .header-logo {
+            height: 48px;
+        }
+        .main-container {
+            max-width: 98%;
+            margin-left: auto;
+            margin-right: auto;
+            background-color: #ffffff;
+        }
+        .table-responsive-wrapper {
+            overflow-x: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+        }
+        table.classification-table {
+            table-layout: fixed;
+            width: 100%;
+            border-collapse: collapse;
+        }
+        thead.table-header th {
+            background-color: #f9fafb;
+            color: #374151;
+            font-weight: 600;
+            letter-spacing: 0.025em;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            text-align: left;
+            padding: 0.75rem 1rem;
+            border-bottom: 2px solid #e5e7eb;
+            border-right: none;
+            word-break: break-word; /* Ensures header text wraps */
+        }
+        tbody.table-body tr {
+            background-color: #ffffff;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        tbody.table-body tr:last-child {
+            border-bottom: none;
+        }
+        tbody.table-body tr:hover {
+            background-color: #f3f4f6;
+        }
+        table.classification-table td {
+            text-align: left;
+            padding: 0.75rem 1rem;
+            border-right: none;
+            word-break: break-word; /* Ensures cell text wraps */
+        }
+        td input[type="text"] {
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            padding: 0.375rem 0.625rem;
+            font-size: 0.875rem;
+            box-shadow: inset 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            width: 100%;
+            box-sizing: border-box;
+        }
+        td input[type="text"]:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgb(59 130 246 / 0.2);
+        }
+        .btn {
+            font-weight: 600;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+            cursor: pointer;
+        }
+        .btn:hover {
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        .btn-primary { background-color: #2563eb; color: white; }
+        .btn-primary:hover { background-color: #1d4ed8; }
+        .btn-secondary { background-color: #10b981; color: white; }
+        .btn-secondary:hover { background-color: #059669; }
+        .btn-tertiary { background-color: #f97316; color: white; }
+        .btn-tertiary:hover { background-color: #ea580c; }
+        tr.status-processing { background-color: #fef3c7 !important; }
+        tr.status-processing:hover { background-color: #fde68a !important; }
+        tr.status-error { background-color: #fee2e2 !important; }
+        tr.status-error td { color: #991b1b !important; }
+        tr.status-error:hover { background-color: #fecaca !important; }
+    </style>
+</head>
+<body class="bg-slate-100 p-3 sm:p-5 text-slate-800">
+
+    <div class="main-container bg-white p-5 sm:p-8 rounded-xl shadow-xl">
+        <header class="flex items-center mb-8 pb-4 border-b border-slate-200">
+            <img src="logo.jpg" alt="GrupoEI Logo" class="header-logo mr-4 sm:mr-6 flex-none">
+            <h1 class="flex-grow text-2xl sm:text-3xl font-bold text-center text-blue-700">
+                Sistema de Clasificación Arancelaria MTR
+            </h1>
+        </header>
+
+        <div id="loginSection" class="mb-8 p-6 border border-slate-200 rounded-lg bg-slate-50 shadow-sm max-w-lg mx-auto">
+            <h2 class="text-xl font-semibold mb-4 text-slate-700 text-center">Identificación de Usuario</h2>
+            <div class="space-y-4">
+                <div>
+                    <label for="emailInput" class="block text-sm font-medium text-slate-600 mb-1">Correo Electrónico:</label>
+                    <input type="email" id="emailInput" placeholder="nombre.apellido@aduax.com"
+                           class="border-slate-300 rounded-md p-2 w-full focus:ring-blue-500 focus:border-blue-500 shadow-sm">
+                </div>
+                <button id="loginButton" class="w-full btn btn-primary">
+                    Ingresar
+                </button>
+            </div>
+            <p id="loginError" class="text-red-600 text-sm mt-3 text-center"></p>
+        </div>
+
+        <div id="appContent" class="hidden">
+            <div id="uploadArea"
+                 class="border-4 border-dashed border-slate-300 p-8 sm:p-12 mb-8 text-center cursor-pointer hover:border-blue-500 transition-colors rounded-lg bg-slate-50 hover:bg-slate-100">
+                <svg class="mx-auto h-16 w-16 text-slate-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                    <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <p class="mt-3 text-base text-slate-600">
+                    Arrastra y suelta hasta 50 archivos PDF aquí, o
+                    <span class="font-semibold text-blue-600 hover:text-blue-500">haz clic para seleccionar</span>.
+                </p>
+                <input type="file" id="fileInput" class="hidden" multiple accept=".pdf">
+            </div>
+
+            <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-x-4">
+                <h2 class="text-xl sm:text-2xl font-semibold text-slate-800 whitespace-nowrap flex-shrink-0">Resultados de Clasificación</h2>
+                <div id="overallStatusDisplayContainer" class="text-md sm:text-lg text-slate-700 flex-grow text-center sm:text-left py-1 order-last sm:order-none mt-2 sm:mt-0">
+                    </div>
+                <div class="flex flex-wrap gap-3 flex-shrink-0">
+                    <button id="exportButton" class="btn btn-secondary text-sm sm:text-base">
+                        Exportar a Excel
+                    </button>
+                    <button id="guardarLogTablaButton" class="btn btn-tertiary text-sm sm:text-base">
+                        Registrar Tabla en Log
+                    </button>
+                </div>
+            </div>
+            <div class="table-responsive-wrapper">
+                <table class="min-w-full text-sm classification-table">
+                    <colgroup>
+                        <col style="width: 12%;"> <col style="width: 9%;">  <col style="width: 9%;">  <col style="width: 5%;">  <col style="width: 9%;">  <col style="width: 7%;">  <col style="width: 15%;"> <col style="width: 6%;">  <col style="width: 6%;">  <col style="width: 8%;">  <col style="width: 6%;">  <col style="width: 6%;">  <col style="width: 8%;">  <col style="width: 18%;"> <col style="width: 7%;">  <col style="width: 7%;">  <col style="width: 7%;">  <col style="width: 6%;">  <col style="width: 5%;">  <col style="width: 15%;"> </colgroup>
+                    <thead class="table-header">
+                        <tr>
+                            <th class="uppercase font-semibold">Archivo</th>
+                            <th class="uppercase font-semibold">Fracción Sugerida</th>
+                            <th class="uppercase font-semibold">Fracción Corregida</th>
+                            <th class="uppercase font-semibold">Dif</th>
+                            <th class="uppercase font-semibold">Fecha</th>
+                            <th class="uppercase font-semibold">Molino</th>
+                            <th class="uppercase font-semibold">Comentario</th>
+                            <th class="uppercase font-semibold">Material</th>
+                            <th class="uppercase font-semibold">Tipo</th>
+                            <th class="uppercase font-semibold">Acabado</th>
+                            <th class="uppercase font-semibold">Ancho (mm)</th>
+                            <th class="uppercase font-semibold">Espesor (mm)</th>
+                            <th class="uppercase font-semibold">Recubrimiento</th>
+                            <th class="uppercase font-semibold">Justificación</th>
+                            <th class="uppercase font-semibold">Heat Number</th>
+                            <th class="uppercase font-semibold">Diámetro Ext. (mm)</th>
+                            <th class="uppercase font-semibold">Espesor Pared (mm)</th>
+                            <th class="uppercase font-semibold">Longitud (m)</th>
+                            <th class="uppercase font-semibold">Enrollado</th>
+                            <th class="uppercase font-semibold">Aleado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultsBody" class="table-body">
+                        </tbody>
+                </table>
+            </div>
+    </div>
+    <script src="./frontend.js"></script>
+</body>
+</html>
