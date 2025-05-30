@@ -4,6 +4,31 @@
 const DEBUG = process.env.DEBUG === 'true'; // Use environment variable for DEBUG
 
 function determinarNICO_Cap72(fraccion, props) {
+  // Log #1: ¿Qué 'props' está recibiendo esta función?
+  if (DEBUG) {
+    console.log(`[NICO Cap72 - INICIO] Llamada para fraccion: ${fraccion}. props.tipoProducto entrante: "${props ? props.tipoProducto : 'props es undefined o null'}"`);
+    if (props && typeof props.tipoProducto !== 'string' && props.tipoProducto !== null && props.tipoProducto !== undefined) {
+        console.error(`[NICO Cap72 - INICIO - ERROR TIPO] props.tipoProducto NO ES STRING, NULL O UNDEFINED. Es: ${typeof props.tipoProducto}, Valor:`, props.tipoProducto);
+    }
+  }
+
+  // Línea de declaración original. Hacerla más explícita para depuración
+  let tipoProductoLocalCrudo;
+  if (props && props.tipoProducto !== undefined && props.tipoProducto !== null) {
+      tipoProductoLocalCrudo = String(props.tipoProducto); // Asegurar que es string antes de toLowerCase
+  } else {
+      tipoProductoLocalCrudo = '';
+  }
+  const tipoProducto = tipoProductoLocalCrudo.toLowerCase();
+
+
+  // Log #2: ¿Cuál es el valor de la constante local 'tipoProducto'?
+  if (DEBUG) {
+    console.log(`[NICO Cap72 - INICIO] Constante local 'tipoProducto' (después de toLowerCase): "${tipoProducto}"`);
+  }
+
+
+
   const texto = `${props.descripcion || ''} ${props.usoTecnico || ''} ${props.observaciones || ''}`
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -352,6 +377,10 @@ function determinarNICO_Cap72(fraccion, props) {
     return '99';
   }
   if (fraccion === '72123003') { // Cincados de otro modo (inmersión)
+      // Log #3: Justo antes de la línea que falla
+    if (DEBUG) {
+        console.log(`[NICO Cap72 - DEBUG 72123003] Fracción: ${fraccion}. Verificando constante local 'tipoProducto'. Valor: "${tipoProducto}"`);
+    }
     // NICO 01: Flejes.
     // NICO 02: Cincados por las dos caras y anchura superior a 500 mm.
     // NICO 99: Los demás.
@@ -359,6 +388,8 @@ function determinarNICO_Cap72(fraccion, props) {
     if ((texto.includes('dos caras') || texto.includes('ambas caras')) && ancho > 500) return '02';
     return '99';
   }
+
+  
   if (fraccion === '72124004') { // Pintados, barnizados o revestidos de plástico
     // NICO 01: Con barniz a base de silicona.
     // NICO 02: De espesor superior o igual a 0.075 mm e inferior o igual a 0.55 mm, revestidos de plástico.
