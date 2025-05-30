@@ -1,63 +1,57 @@
-// --- INICIO DEL ARCHIVO leerComposicionQuimica.js (VERSIÓN CON MEJORAS EN DEBUGGING Y MANEJO DE 'CE LF') ---
+// leerComposicionQuimica.js
 
 function detectarComposicionQuimica(texto, tipoProductoDebug = "No especificado") {
   const DEBUG_THIS_FUNCTION = process.env.DEBUG_COMPOSICION === 'true' || true;
 
-
   if (DEBUG_THIS_FUNCTION) {
     console.log(`📄 Texto recibido para detectarComposicionQuimica (producto: ${tipoProductoDebug}, longitud: ${texto?.length || 0}).`);
-    // Para no llenar la consola, el texto completo se guarda en archivo desde server.js
   }
 
+
+  
+// Al inicio de detectarComposicionQuimica
   const composicion = {
     carbono: null, fosforo: null, silicio: null, manganeso: null, niquel: null,
     cromo: null, molibdeno: null, vanadio: null, niobio: null, aluminio: null,
     cobre: null, azufre: null, titanio: null, boro: null, nitrogeno: null,
     wolframio: null, circonio: null, estaño: null, calcio: null, arsenico: null, ce_lf: null,
+    aluminioSoluble: null, 
+    antimonio: null, 
+    cobalto: null, 
+    bismuto: null, 
+    magnesio: null, 
+    plomo: null,
     aleado: false, tipoAcero: 'sin alear', elementosAleantes: [],
     justificacionAleado: '', valoresDescartados: []
   };
 
-
-
-//   const mapElementos = {
-//     C: 'carbono', SI: 'silicio', MN: 'manganeso', P: 'fosforo', S: 'azufre',
-//     AL: 'aluminio', CR: 'cromo', CU: 'cobre', MO: 'molibdeno', N: 'nitrogeno',
-//     NI: 'niquel', NB: 'niobio', TI: 'titanio', B: 'boro', V: 'vanadio',
-//     W: 'wolframio', ZR: 'circonio', SN: 'estaño', CA: 'calcio', AS: 'arsenico',
-//     'CE LF': 'ce_lf', CEL: 'ce_lf', // CE LF is important
-//     S1: 'silicio', N0: 'niobio', F1: 'fosforo'
-//   };
-
-
-//   const divisoresTenarisPredeterminados = {
-//     C: 100, MN: 100, SI: 100, CR: 100, NI: 100, MO: 100, CU: 100, 'CE LF': 100, CEL: 100,
-//     P: 1000, S: 1000, SN: 1000,
-//     AL: 10000, NB: 10000, TI: 10000, V: 10000, N: 10000, B: 10000
-//   };
-
-// In leerComposicionQuimica.js
-
-const mapElementos = {
+  const mapElementos = {
     C: 'carbono', SI: 'silicio', MN: 'manganeso', P: 'fosforo', S: 'azufre',
     AL: 'aluminio', CR: 'cromo', CU: 'cobre', MO: 'molibdeno', N: 'nitrogeno',
-    NI: 'niquel', NB: 'niobio', TI: 'titanio', B: 'boro', V: 'vanadio',
+    NI: 'niquel', NB: 'niobio', CB: 'niobio', 
+    TI: 'titanio', B: 'boro', V: 'vanadio',
     W: 'wolframio', ZR: 'circonio', SN: 'estaño', CA: 'calcio', AS: 'arsenico',
-    'CE LF': 'ce_lf', // Keep this for future reference or if parsing changes
-    CEL: 'ce_lf',     // Keep this
-    CELF: 'ce_lf',    // ***** ADD THIS LINE to match the observed token *****
+    PB: 'plomo',
+    SOL: 'aluminioSoluble', 
+    SB: 'antimonio',
+    CO: 'cobalto',
+    BI: 'bismuto',
+    MG: 'magnesio',
+    'CE LF': 'ce_lf', CEL: 'ce_lf', CELF: 'ce_lf', 
+    CE: 'ce_lf', 
     S1: 'silicio', N0: 'niobio', F1: 'fosforo'
-}; // <<<< Closing brace was missing here in my previous example
+  };
 
-const divisoresTenarisPredeterminados = {
-    C: 100, MN: 100, SI: 100, CR: 100, NI: 100, MO: 100, CU: 100,
-    'CE LF': 100,
-    CEL: 100,
-    CELF: 100, // ***** ADD CELF HERE to match the observed token *****
-    P: 1000, S: 1000, SN: 1000,
-    AL: 10000, NB: 10000, TI: 10000, V: 10000, N: 10000, B: 10000
-}; // <<<< Closing brace was missing here in my previous example
-
+  const divisoresTenarisPredeterminados = {
+    C: 100, MN: 100, SI: 100, CR: 100, MO: 100, 
+    AL: 100,    
+    SOL: 100,   
+    CU: 100,
+    P: 1000, NI: 1000, V: 1000, 
+    SN: 1000, AS: 1000, NB: 1000, TI: 1000, PB: 1000, SB: 1000, CO: 1000, S: 1000,
+    ZR: 10000, BI: 10000, CA: 10000, B: 10000, N: 10000, MG: 10000, W: 10000,
+    'CE LF': 100, CEL: 100, CELF: 100, CE: 100
+  };
 
   const umbralesAleado = {
     boro: 0.0008, cromo: 0.3, vanadio: 0.1, molibdeno: 0.08, niquel: 0.3,
@@ -89,130 +83,411 @@ const divisoresTenarisPredeterminados = {
 
   if (DEBUG_THIS_FUNCTION) console.log("--- Iniciando detección de composición química ---");
 
-  // --- INICIO LÓGICA FORMATO "LADLE_V5.6" ---
-  const fraseLadle = "CHEMICAL COMPOSITION OF THE LADLE";
-  let idxFraseLadle = -1;
-  for (let i = 0; i < lineas.length; i++) {
-    if (lineas[i].toUpperCase().includes(fraseLadle)) {
-      idxFraseLadle = i;
-      break;
-    }
+
+//   // --- INICIO LÓGICA FORMATO "LADLE_V5.6" ---
+
+
+// // --- INICIO LÓGICA FORMATO "LADLE_V5.6" (Revisado para Calvert) ---
+//   const fraseLadle = "CHEMICAL COMPOSITION OF THE LADLE";
+//   let idxFraseLadle = -1;
+//   for (let i = 0; i < lineas.length; i++) {
+//     if (lineas[i].toUpperCase().includes(fraseLadle)) {
+//       idxFraseLadle = i;
+//       break;
+//     }
+//   }
+
+//   if (idxFraseLadle !== -1) {
+//     formatoDetectado = "LADLE_V5.6"; // Asumir inicialmente
+//     if (DEBUG_THIS_FUNCTION) console.log(`🎯 Formato potencial LADLE_V5.6 detectado por frase en línea ${idxFraseLadle}: "${lineas[idxFraseLadle]}"`);
+//     if (DEBUG_THIS_FUNCTION && idxFraseLadle !== -1) {
+//     console.log("------------------------------------------------------");
+//     console.log("DEBUG: Contenido de 'lineas' después de la frase clave:");
+//     for (let j = idxFraseLadle + 1; j < Math.min(idxFraseLadle + 6, lineas.length); j++) {
+//         console.log(`lineas[${j}] (original): "${lineas[j]}"`);
+//         console.log(`lineas[${j}] (trimmed) : "${lineas[j].trim()}"`);
+//     }
+//     console.log("------------------------------------------------------");
+// }
+
+// // Dentro del bloque if (idxFraseLadle !== -1) { ... } para LADLE_V5.6
+
+//     let idxMainSymbolLine = -1;
+//     let mainSymbolLineText = "";
+
+//     const searchRangeStart = idxFraseLadle + 1;
+//     // Ampliamos un poco el rango por si hay líneas vacías extras.
+//     const searchRangeEnd = Math.min(idxFraseLadle + 6, lineas.length); 
+
+//     for (let i = searchRangeStart; i < searchRangeEnd; i++) {
+//         const currentLineOriginal = lineas[i]; // Guardar original para logs si es necesario
+//         const currentLine = currentLineOriginal.trim();
+//         const currentLineUpper = currentLine.toUpperCase();
+
+//         if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) Verificando línea [idx ${i}] para SÍMBOLOS: "${currentLine}"`);
+
+//         if (currentLine.length < 10) { // Demasiado corta para ser la línea de símbolos principal
+//             if (DEBUG_THIS_FUNCTION) console.log(`      Línea [idx ${i}] descartada: demasiado corta.`);
+//             continue;
+//         }
+//         if (/^\d/.test(currentLine)) { // Empieza con dígito, probablemente línea de valores
+//             if (DEBUG_THIS_FUNCTION) console.log(`      Línea [idx ${i}] descartada: empieza con dígito.`);
+//             continue;
+//         }
+
+//         // Criterios para ser una línea de símbolos:
+//         // 1. Debe contener un conjunto mínimo de símbolos químicos clave.
+//         // 2. Puede empezar con "HEAT" o directamente con símbolos, o incluso con "NO." si está mal parseado.
+        
+//         let potentialSymbolText = currentLine;
+//         let potentialSymbolTextUpper = currentLineUpper;
+
+//         // Intentar limpiar prefijos comunes si existen
+//         if (currentLineUpper.startsWith("HEAT ")) {
+//             potentialSymbolText = currentLine.substring(5); // Quita "HEAT "
+//             potentialSymbolTextUpper = potentialSymbolText.toUpperCase();
+//         } else if (currentLineUpper.startsWith("NO. ")) { // Específicamente para el caso "No. C Si Mn..."
+//             potentialSymbolText = currentLine.substring(4); // Quita "No. "
+//             potentialSymbolTextUpper = potentialSymbolText.toUpperCase();
+//         }
+//          // Asegurarse que después de la limpieza, la línea aún comience con un carácter alfabético (símbolo)
+//         if (!/^[A-Z]/.test(potentialSymbolTextUpper.trim())) {
+//              if (DEBUG_THIS_FUNCTION) console.log(`      Línea [idx ${i}] descartada: después de limpiar prefijos, no empieza con letra: "${potentialSymbolText.trim()}"`);
+//              continue;
+//         }
+
+
+//         const keySymbols = ['C', 'SI', 'MN', 'P', 'S', 'AL'];
+//         let foundKeySymbols = 0;
+//         keySymbols.forEach(s => {
+//             // Usar word boundaries para evitar falsos positivos (e.g., "CA" encontrando "C")
+//             // pero \b no funciona bien con todos los casos de pdftotext. Includes es más permisivo.
+//             // Para mayor precisión, podríamos usar regex con espacios: new RegExp(`\\s${s}\\s`) o `^${s}\\s` o `\\s${s}$`
+//             if (potentialSymbolTextUpper.includes(s)) { 
+//                 foundKeySymbols++;
+//             }
+//         });
+
+//         if (DEBUG_THIS_FUNCTION) console.log(`      Línea [idx ${i}] procesada como "${potentialSymbolText}". Símbolos clave encontrados: ${foundKeySymbols} de ${keySymbols.length}.`);
+
+//         // Si encontramos suficientes símbolos clave (ej. al menos 4 de 6)
+//         if (foundKeySymbols >= 4) {
+//             mainSymbolLineText = potentialSymbolText; // Usar el texto ya procesado (sin "Heat" o "No.")
+//             idxMainSymbolLine = i;
+//             if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) ✅ Línea de SÍMBOLOS ENCONTRADA (idx ${idxMainSymbolLine}): "${mainSymbolLineText}" (Original: "${currentLineOriginal}")`);
+//             break; 
+//         }
+//     }
+//     // El resto del bloque LADLE_V5.6 (procesamiento de mainSymbolLineText, búsqueda de línea de valores, etc.) continúa aquí...
+//     // Asegúrate que la lógica que sigue a esto utilice 'mainSymbolLineText' que ahora NO debería tener "HEAT" o "NO." al inicio.
+//     // La línea: let simbolosTextoLimpio = mainSymbolLineText; ya no necesitaría las primeras dos condiciones 'if/else if' para HEAT/HEAT NO.
+//     // sino solo: simbolosTextoLimpio = mainSymbolLineText.trim().replace(/^[^A-Z]+/i, '').trim();
+//     // O mejor aún, ya que 'mainSymbolLineText' se ha limpiado, solo usarla directamente.
+
+//     // ---------- INICIO DEL RESTO DEL BLOQUE LADLE_V5.6 (desde donde se procesa mainSymbolLineText) -------------
+//     if (idxMainSymbolLine === -1) { // Si después del bucle no se encontró
+//         if (DEBUG_THIS_FUNCTION) console.warn(`  (${formatoDetectado}) ⚠️ No se pudo encontrar la línea principal de símbolos.`);
+//         formatoDetectado = null;
+//     } else {
+//         // 'mainSymbolLineText' ya debería estar relativamente limpia de prefijos "Heat" o "No."
+//         // Pero una limpieza final por si acaso.
+//         const simbolosTextoLimpioFinal = mainSymbolLineText.trim().replace(/^[^A-Z]+/i, '').trim();
+
+//         const todosSimbolos = simbolosTextoLimpioFinal.split(/\s+/).filter(s => s && s.length > 0 && mapElementos[s.toUpperCase()]);
+//         if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) Símbolos extraídos (${todosSimbolos.length}): [${todosSimbolos.join(', ')}] de texto limpio: "${simbolosTextoLimpioFinal}"`);
+
+//         if (todosSimbolos.length < 5) { 
+//             if (DEBUG_THIS_FUNCTION) console.warn(`  (${formatoDetectado}) ⚠️ Pocos símbolos válidos (${todosSimbolos.length}) extraídos. Verifique mapElementos y la línea de símbolos.`);
+//             formatoDetectado = null;
+//         } else {
+//             let idxMainValueLine = -1;
+//             let mainValueLineText = "";
+//             for (let i = idxMainSymbolLine + 1; i < Math.min(idxMainSymbolLine + 3, lineas.length); i++) {
+//                 const currentLine = lineas[i].trim();
+//                 if (currentLine === "" || currentLine.toUpperCase() === "NO.") { 
+//                     if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) Saltando línea de valores candidata [idx ${i}]: "${currentLine}" (vacía o "No.")`);
+//                     continue;
+//                 }
+//                 const tokens = currentLine.split(/\s+/);
+//                 if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) Verificando línea de VALORES candidata [idx ${i}]: "${currentLine}". Tokens: ${tokens.length}`);
+//                 if (tokens.length >= todosSimbolos.length && /\d{6,}/.test(tokens[0]) && !isNaN(parseFloat(tokens[1]))) {
+//                     idxMainValueLine = i;
+//                     mainValueLineText = currentLine;
+//                     if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) ✅ Línea de VALORES ENCONTRADA: "${mainValueLineText}" en idx ${idxMainValueLine}`);
+//                     break;
+//                 } else if (DEBUG_THIS_FUNCTION) {
+//                      console.log(`  (${formatoDetectado}) Línea [idx ${i}] no cumple criterios de valores. Tokens[0]: ${tokens[0]}, test HeatNo: ${/\d{6,}/.test(tokens[0])}, parseFloat(tokens[1]): ${parseFloat(tokens[1])}`);
+//                 }
+//             }
+            
+//             if (idxMainValueLine === -1) {
+//                 if (DEBUG_THIS_FUNCTION) console.warn(`  (${formatoDetectado}) ⚠️ No se pudo encontrar la línea principal de valores (Heat No. + números).`);
+//                 formatoDetectado = null;
+//             } else {
+//                 const valorTokens = mainValueLineText.split(/\s+/);
+//                 let heatNumberExtraidoLadle = null;
+//                 let todosValores = [];
+//                 if (/\d{6,}/.test(valorTokens[0])) {
+//                     heatNumberExtraidoLadle = valorTokens[0];
+//                     todosValores = valorTokens.slice(1).map(v => parseFloat(v.replace(',', '.'))).filter(val => !isNaN(val));
+//                     if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) Heat Number ${heatNumberExtraidoLadle} extraído.`);
+//                 } else {
+//                     todosValores = valorTokens.map(v => parseFloat(v.replace(',', '.'))).filter(val => !isNaN(val));
+//                 }
+//                 if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) Valores numéricos extraídos (${todosValores.length}): [${todosValores.join(', ')}]`);
+
+//                 if (todosValores.length < todosSimbolos.length * 0.8) { 
+//                     if (DEBUG_THIS_FUNCTION) console.warn(`  (${formatoDetectado}) ⚠️ Muy pocos valores numéricos (${todosValores.length}) extraídos para ${todosSimbolos.length} símbolos.`);
+//                     formatoDetectado = null;
+//                 } else {
+//                     composicion.valoresDescartados = [];
+//                     if (todosSimbolos.length !== todosValores.length && DEBUG_THIS_FUNCTION) {
+//                         // (Misma lógica de advertencia y manejo de descarte que antes)
+//                         console.warn(`  (${formatoDetectado}) ⚠️ Desajuste: Símbolos (${todosSimbolos.length}) vs Valores (${todosValores.length}).`);
+//                         if (todosValores.length > todosSimbolos.length) {
+//                             const descartados = todosValores.slice(todosSimbolos.length);
+//                             composicion.valoresDescartados.push(...descartados);
+//                             console.warn(`  (${formatoDetectado}) ✂️ Valores descartados (exceso): ${descartados.join(', ')}`);
+//                         } else {
+//                             const simbolosSinValor = todosSimbolos.slice(todosValores.length);
+//                             console.warn(`  (${formatoDetectado}) 📉 Símbolos sin valor asignado: ${simbolosSinValor.join(', ')}`);
+//                         }
+//                     }
+//                     const minLength = Math.min(todosSimbolos.length, todosValores.length);
+//                     for (let k = 0; k < minLength; k++) {
+//                         const simUpper = todosSimbolos[k].toUpperCase();
+//                         const clave = mapElementos[simUpper];
+//                         const valor = todosValores[k];
+//                         if (clave && valor !== undefined && !isNaN(valor)) {
+//                             composicion[clave] = parseFloat(valor.toFixed(6)); 
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+//     }
+// // ---------- FIN DEL RESTO DEL BLOQUE LADLE_V5.6 -------------
+
+
+//   } else {
+//      // La fraseLadle no fue encontrada, no se hace nada aquí.
+//      // La variable formatoDetectado permanece como null o con el valor de un formato previo.
+//   }
+
+// --- INICIO LÓGICA FORMATO "LADLE_V5.6" (Definitivo para Calvert MTR) ---
+
+// --- INICIO LÓGICA FORMATO "LADLE_V5.6" (Definitivo para Calvert MTR v3) ---
+const fraseLadle = "CHEMICAL COMPOSITION OF THE LADLE";
+let idxFraseLadle = -1;
+for (let i = 0; i < lineas.length; i++) {
+  if (lineas[i].toUpperCase().includes(fraseLadle)) {
+    idxFraseLadle = i;
+    break;
   }
+}
 
-  if (idxFraseLadle !== -1 && lineas.length > idxFraseLadle + 5) {
-    formatoDetectado = "LADLE_V5.6";
-    if (DEBUG_THIS_FUNCTION) console.log(`🎯 Formato detectado: "${formatoDetectado}" en línea ${idxFraseLadle} ("${lineas[idxFraseLadle]}")`);
+if (idxFraseLadle !== -1) {
+  formatoDetectado = "LADLE_V5.6";
+  if (DEBUG_THIS_FUNCTION) console.log(`🎯 Formato potencial LADLE_V5.6 detectado por frase en línea ${idxFraseLadle}: "${lineas[idxFraseLadle]}"`);
 
-    const ls1_ocr = lineas[idxFraseLadle + 2] || "";
-    const lv1_ocr = lineas[idxFraseLadle + 3] || "";
-    const ls2_ocr = lineas[idxFraseLadle + 4] || "";
-    const lv2_ocr = lineas[idxFraseLadle + 5] || "";
+  let simbolosParte1Texto = "";
+  let simbolosParte2Texto = "";
+  let valoresParte1Array = [];
+  let valoresParte2Array = [];
+  let heatNumberExtraidoLadle = null;
+  let todosSimbolos = [];
+  let todosValores = [];
 
-    if (DEBUG_THIS_FUNCTION) {
-        console.log(`  (${formatoDetectado}) LS1_OCR (idx ${idxFraseLadle + 2}): "${ls1_ocr}"`);
-        console.log(`  (${formatoDetectado}) LV1_OCR (idx ${idxFraseLadle + 3}): "${lv1_ocr}"`);
-        console.log(`  (${formatoDetectado}) LS2_OCR (idx ${idxFraseLadle + 4}): "${ls2_ocr}"`);
-        console.log(`  (${formatoDetectado}) LV2_OCR (idx ${idxFraseLadle + 5}): "${lv2_ocr}"`);
+  // Índices basados en la estructura observada en MTR_EJEMPLO_CALVERT.txt y logs
+  const idxSimbolosP1Expected = idxFraseLadle + 4; // Línea "C Si Mn P S Al Cr Cu Mo N"
+  const idxValoresP1Expected = idxFraseLadle + 5; // Línea "1680845 0.0741 ..."
+  const idxSimbolosP2Expected = idxFraseLadle + 6; // Línea "Ni Nb Ti B V Ca"
+  const idxValoresP2Expected = idxFraseLadle + 7; // Línea "0.007 0.048 ..."
+
+  // Extracción de Símbolos Parte 1
+  if (lineas.length > idxSimbolosP1Expected && lineas[idxSimbolosP1Expected]) {
+    let tempText = lineas[idxSimbolosP1Expected].trim();
+    // La línea "No. C Si Mn..." del log estaba en lineas[39] y idxFraseLadle=37 -> 37+2.
+    // Pero el CALVERT.TXT muestra C Si Mn... en la línea idxFraseLadle + 4 (después de Heat, No., <vacio>)
+    // El log de lineas muestra lineas[39] ("No. C Si Mn...") como idxFraseLadle+2
+    // Si la frase clave está en 37, entonces 39 es idxFraseLadle+2. Si este es el caso, ajustamos:
+    // La discrepancia entre el .txt y el log de lineas[] es importante.
+    // Usaremos el log de lineas[] como la fuente de verdad de lo que el script ve.
+    // Log: lineas[39] es "No. C Si Mn P S Al Cr Cu Mo N" -> idxFraseLadle + 2
+    // Log: lineas[41] es "1680845..." -> idxFraseLadle + 4
+    
+    // REAJUSTE DE ÍNDICES BASADO EN EL LOG MÁS RECIENTE (el que tiene el DEBUG de lineas)
+    const idxSimbolosP1Actual = idxFraseLadle + 2; // lineas[39] en el log
+    const idxValoresP1Actual = idxFraseLadle + 4;  // lineas[41] en el log
+
+    // SÍMBOLOS PARTE 1 desde lineas[idxSimbolosP1Actual]
+    if (lineas.length > idxSimbolosP1Actual && lineas[idxSimbolosP1Actual]) {
+        let lineP1Symbols = lineas[idxSimbolosP1Actual].trim();
+        let P1TextToParse = lineP1Symbols;
+        if (lineP1Symbols.toUpperCase().startsWith("NO. ")) {
+            P1TextToParse = lineP1Symbols.substring(4);
+        }
+        if (P1TextToParse.toUpperCase().includes("C") && P1TextToParse.toUpperCase().includes("SI")) {
+            simbolosParte1Texto = P1TextToParse;
+            if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) ✅ Símbolos Parte 1 (de línea ${idxSimbolosP1Actual}): "${simbolosParte1Texto}" (Original: "${lineas[idxSimbolosP1Actual]}")`);
+        } else {
+            if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) ⚠️ Línea ${idxSimbolosP1Actual} no contiene Símbolos Parte 1 esperados: "${lineas[idxSimbolosP1Actual]}"`);
+            formatoDetectado = null;
+        }
+    } else {
+        if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) ⚠️ Línea ${idxSimbolosP1Actual} para Símbolos Parte 1 no disponible.`);
+        formatoDetectado = null;
     }
 
-    let todosSimbolos = [];
+    // VALORES PARTE 1 desde lineas[idxValoresP1Actual]
+    if (formatoDetectado && lineas.length > idxValoresP1Actual && lineas[idxValoresP1Actual]) {
+        const lineP1Values = lineas[idxValoresP1Actual].trim();
+        if (/^\d{6,}/.test(lineP1Values)) {
+            const tokens = lineP1Values.split(/\s+/);
+            heatNumberExtraidoLadle = tokens[0];
+            valoresParte1Array = tokens.slice(1).map(v => parseFloat(v.replace(',', '.'))).filter(val => !isNaN(val));
+            if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) ✅ Valores Parte 1 (de línea ${idxValoresP1Actual}): Heat=${heatNumberExtraidoLadle}, Valores=[${valoresParte1Array.join(', ')}]`);
+        } else {
+            if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) ⚠️ Línea ${idxValoresP1Actual} no parece Valores Parte 1: "${lineP1Values}"`);
+            formatoDetectado = null;
+        }
+    } else if (formatoDetectado) {
+        if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) ⚠️ Línea ${idxValoresP1Actual} para Valores Parte 1 no disponible.`);
+        formatoDetectado = null;
+    }
 
-    if (ls1_ocr) {
-        const simbolosTextoP1 = ls1_ocr.replace(/^No\.\s*/i, '').trim();
-        const palabrasP1 = simbolosTextoP1.split(/\s+/);
+    // Ahora necesitamos encontrar Símbolos Parte 2 y Valores Parte 2
+    // En el MTR_EJEMPLO_CALVERT.txt, están en las líneas siguientes a Valores Parte 1
+    // Si Valores P1 fue lineas[idxValoresP1Actual], entonces
+    // Símbolos P2 debería ser lineas[idxValoresP1Actual + 1] (si no hay vacías)
+    // Valores P2 debería ser lineas[idxValoresP1Actual + 2] (si no hay vacías)
 
-        palabrasP1.forEach(palabra => {
-            let simboloParaMapear = palabra.toUpperCase();
+    let currentSearchIdx = idxValoresP1Actual + 1;
+    let foundP2Symbols = false;
 
-            if (simboloParaMapear === "[4" || simboloParaMapear === "[" || simboloParaMapear === "L4") {
-                simboloParaMapear = "P";
-            } else {
-                simboloParaMapear = simboloParaMapear.replace(/[^\w]/g, '');
+    // Buscar Símbolos Parte 2
+    if (formatoDetectado) {
+        for (let i = currentSearchIdx; i < Math.min(currentSearchIdx + 3, lineas.length); i++) {
+            const lineP2SymbolsCandidate = lineas[i] ? lineas[i].trim() : "";
+            if (lineP2SymbolsCandidate === "") { currentSearchIdx++; continue; } // Avanzar índice si la línea está vacía
+
+            if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) Buscando Símbolos P2 [idx ${i}]: "${lineP2SymbolsCandidate}"`);
+            if (lineP2SymbolsCandidate.toUpperCase().includes("NI") && lineP2SymbolsCandidate.toUpperCase().includes("NB") && !/^\d/.test(lineP2SymbolsCandidate)) {
+                simbolosParte2Texto = lineP2SymbolsCandidate;
+                currentSearchIdx = i + 1; // Siguiente línea para Valores P2
+                foundP2Symbols = true;
+                if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) ✅ Símbolos Parte 2 (de línea ${i}): "${simbolosParte2Texto}"`);
+                break;
             }
+        }
+        if (!foundP2Symbols && DEBUG_THIS_FUNCTION) {
+            console.log(`  (${formatoDetectado}) ℹ️ No se encontró Símbolos Parte 2 explícitamente.`);
+            // No se resetea formatoDetectado aquí, puede que no haya P2.
+        }
+    }
 
-            if (mapElementos[simboloParaMapear]) {
-                todosSimbolos.push(simboloParaMapear);
-            } else if (simboloParaMapear && DEBUG_THIS_FUNCTION) {
-                if (simboloParaMapear.length > 0 && !["NO", "HEAT"].includes(simboloParaMapear)) {
-                   console.log(`  (${formatoDetectado}) Símbolo P1 no mapeado/ignorado: "${palabra}" (procesado como "${simboloParaMapear}")`);
+    // Buscar Valores Parte 2 (solo si se encontraron Símbolos Parte 2)
+    if (formatoDetectado && foundP2Symbols && simbolosParte2Texto) {
+         for (let i = currentSearchIdx; i < Math.min(currentSearchIdx + 3, lineas.length); i++) {
+            const lineP2ValuesCandidate = lineas[i] ? lineas[i].trim() : "";
+             if (lineP2ValuesCandidate === "") { currentSearchIdx++; continue; }
+
+            if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) Buscando Valores P2 [idx ${i}]: "${lineP2ValuesCandidate}"`);
+            // Valores P2 no tienen HeatNo, solo son números
+            const potentialValues = lineP2ValuesCandidate.split(/\s+/).map(v => parseFloat(v.replace(',', '.'))).filter(val => !isNaN(val));
+            if (potentialValues.length > 0 && potentialValues.every(v => !isNaN(v))) { // Todos deben ser números
+                const simbolosP2ArrayTemp = simbolosParte2Texto.split(/\s+/).filter(s => s && mapElementos[s.toUpperCase()]);
+                if (potentialValues.length === simbolosP2ArrayTemp.length) { // Coincidencia en cantidad
+                    valoresParte2Array = potentialValues;
+                    if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) ✅ Valores Parte 2 (de línea ${i}): [${valoresParte2Array.join(', ')}]`);
+                    break;
+                } else if (DEBUG_THIS_FUNCTION) {
+                     console.log(`  (${formatoDetectado}) ⚠️ Desajuste entre Símbolos P2 (${simbolosP2ArrayTemp.length}) y Valores P2 encontrados (${potentialValues.length}) en línea ${i}.`);
                 }
             }
-        });
-    }
-    if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) Símbolos después de P1 (y N si estaba en LS1): [${todosSimbolos.join(', ')}] (Count: ${todosSimbolos.length})`);
+        }
+        if (valoresParte2Array.length === 0 && DEBUG_THIS_FUNCTION) {
+             console.warn(`  (${formatoDetectado}) ⚠️ Símbolos Parte 2 encontrados pero no sus Valores Parte 2 correspondientes.`);
+             // No necesariamente un error fatal si P2 no siempre está presente.
+        }
+    
 
-    if (ls2_ocr) {
-        const palabrasS2 = ls2_ocr.split(/\s+/);
-        for (let j = 0; j < palabrasS2.length; j++) {
-            let p = palabrasS2[j];
-            if (p === '\\' && palabrasS2[j+1]?.toUpperCase().startsWith('CA')) {
-                if (mapElementos["V"]) todosSimbolos.push("V");
-                if (mapElementos["CA"]) todosSimbolos.push("CA");
-                j++;
-                continue;
-            }
-            const pUpper = p.toUpperCase().replace(/[^\w]/g, '');
-            if (mapElementos[pUpper]) {
-                todosSimbolos.push(pUpper);
+
+    // Consolidar y Mapear
+    if (formatoDetectado && simbolosParte1Texto && valoresParte1Array.length > 0) {
+        const simbolosP1Array = simbolosParte1Texto.split(/\s+/).filter(s => s && mapElementos[s.toUpperCase()]);
+        todosSimbolos.push(...simbolosP1Array);
+        todosValores.push(...valoresParte1Array);
+
+        // Solo añadir P2 si ambos, símbolos y valores, fueron encontrados y tienen contenido
+        if (simbolosParte2Texto && valoresParte2Array.length > 0) {
+            const simbolosP2Array = simbolosParte2Texto.split(/\s+/).filter(s => s && mapElementos[s.toUpperCase()]);
+            // Asegurarse que el número de símbolos y valores P2 coincida
+            if (simbolosP2Array.length === valoresParte2Array.length) {
+                todosSimbolos.push(...simbolosP2Array);
+                todosValores.push(...valoresParte2Array);
+            } else if (DEBUG_THIS_FUNCTION) {
+                console.warn(`  (${formatoDetectado}) ⚠️ No se añadirán Símbolos/Valores P2 debido a desajuste en cantidad (S:${simbolosP2Array.length}, V:${valoresParte2Array.length})`);
             }
         }
-    }
-    if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) Todos los Símbolos (final LADLE): [${todosSimbolos.join(', ')}] (Count: ${todosSimbolos.length})`);
 
-    let valoresP1 = lv1_ocr ? extraerNumerosDesdeTexto(lv1_ocr, `(${formatoDetectado}) LV1:`) : [];
-    let heatNumberExtraido = null;
-    if (valoresP1.length > 0 && valoresP1[0] > 100000 && Number.isInteger(valoresP1[0])) {
-        heatNumberExtraido = valoresP1.shift();
-        if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) Heat Number ${heatNumberExtraido} removido de ValoresP1.`);
-    }
+        if (DEBUG_THIS_FUNCTION) {
+            console.log(`  (${formatoDetectado}) Símbolos TOTALES extraídos (${todosSimbolos.length}): [${todosSimbolos.join(', ')}]`);
+            console.log(`  (${formatoDetectado}) Valores TOTALES extraídos (${todosValores.length}): [${todosValores.join(', ')}]`);
+        }
 
-    const idxMoEnTodosSimbolos = todosSimbolos.indexOf("MO");
-    if (idxMoEnTodosSimbolos !== -1 && idxMoEnTodosSimbolos < valoresP1.length && valoresP1[idxMoEnTodosSimbolos] === 0 && lv1_ocr.includes(" 000 ")) {
-        valoresP1[idxMoEnTodosSimbolos] = 0.00;
-         if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) Corrección especial para Mo en LV1: 0 -> 0.00 en índice ${idxMoEnTodosSimbolos} de valoresP1.`);
-    }
-
-    let valoresP2 = lv2_ocr ? extraerNumerosDesdeTexto(lv2_ocr, `(${formatoDetectado}) LV2:`) : [];
-    const todosValores = [...valoresP1, ...valoresP2];
-    if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) Todos los Valores (HN removido, LADLE): [${todosValores.join(', ')}] (Count: ${todosValores.length})`);
-
-    composicion.valoresDescartados = [];
-    if (todosSimbolos.length !== todosValores.length && DEBUG_THIS_FUNCTION) {
-        console.warn(`⚠️ (${formatoDetectado}) Desajuste final: Símbolos (${todosSimbolos.length}) vs Valores (${todosValores.length}).`);
-        if (todosValores.length > todosSimbolos.length) {
-            const descartados = todosValores.slice(todosSimbolos.length);
-            composicion.valoresDescartados.push(...descartados);
-            console.warn(`✂️ (${formatoDetectado}) Valores descartados (exceso): ${descartados.join(', ')}`);
+        // Para Calvert esperamos ~16 símbolos y valores en total
+        if (todosSimbolos.length < 15 || todosValores.length < 15) {
+          if (DEBUG_THIS_FUNCTION) console.warn(`  (${formatoDetectado}) ⚠️ Insuficientes símbolos o valores totales extraídos para Calvert (S:${todosSimbolos.length}, V:${todosValores.length}). Mínimo esperado: ~15.`);
+          formatoDetectado = null; // Falló en obtener la data completa
         } else {
-            const simbolosSinValor = todosSimbolos.slice(todosValores.length);
-            console.warn(`📉 (${formatoDetectado}) Símbolos sin valor: ${simbolosSinValor.join(', ')}`);
+            // Mapeo final
+            composicion.valoresDescartados = [];
+            if (todosSimbolos.length !== todosValores.length && DEBUG_THIS_FUNCTION) {
+                console.warn(`  (${formatoDetectado}) ⚠️ Desajuste Final: Símbolos (${todosSimbolos.length}) vs Valores (${todosValores.length}).`);
+                // (Manejo de descarte como antes)
+                 if (todosValores.length > todosSimbolos.length) {
+                    const descartados = todosValores.slice(todosSimbolos.length);
+                    if (descartados.length > 0) composicion.valoresDescartados.push(...descartados);
+                    if (DEBUG_THIS_FUNCTION && descartados.length > 0) console.warn(`  (${formatoDetectado}) ✂️ Valores descartados (exceso): ${descartados.join(', ')}`);
+                } else {
+                    const simbolosSinValor = todosSimbolos.slice(todosValores.length);
+                    if (DEBUG_THIS_FUNCTION && simbolosSinValor.length > 0) console.warn(`  (${formatoDetectado}) 📉 Símbolos sin valor asignado: ${simbolosSinValor.join(', ')}`);
+                }
+            }
+
+            const minLength = Math.min(todosSimbolos.length, todosValores.length);
+            for (let k = 0; k < minLength; k++) {
+                const simUpper = todosSimbolos[k].toUpperCase();
+                const clave = mapElementos[simUpper];
+                const valor = todosValores[k];
+                if (clave && valor !== undefined && !isNaN(valor)) {
+                    composicion[clave] = parseFloat(valor.toFixed(6));
+                }
+            }
         }
+    } else if (formatoDetectado) { // Si no se encontraron Símbolos P1 o Valores P1 válidos
+         if (DEBUG_THIS_FUNCTION) console.warn(`  (${formatoDetectado}) ⚠️ Fallo crítico al obtener Símbolos Parte 1 o Valores Parte 1.`);
+         formatoDetectado = null;
     }
 
-    const minLengthLadle = Math.min(todosSimbolos.length, todosValores.length);
-    for (let k = 0; k < minLengthLadle; k++) {
-        const simUpper = todosSimbolos[k];
-        const clave = mapElementos[simUpper];
-        const valor = todosValores[k];
-
-        if (clave && valor !== undefined && !isNaN(valor)) {
-            composicion[clave] = parseFloat(valor.toFixed(6));
-        } else if (clave && (valor === undefined || isNaN(valor))) {
-            if (DEBUG_THIS_FUNCTION) console.warn(`📉 (${formatoDetectado}) Símbolo ${todosSimbolos[k]} (${clave}) sin valor numérico (${valor}).`);
-        } else if (!clave) {
-            if (DEBUG_THIS_FUNCTION) console.warn(`🚫 (${formatoDetectado}) Símbolo "${todosSimbolos[k]}" (procesado como "${simUpper}") no mapeado.`);
-        }
-    }
-  } else {
-      if (idxFraseLadle !== -1 && DEBUG_THIS_FUNCTION) {
-          console.warn(`  (LADLE_V5.6) No hay suficientes líneas después del encabezado para procesar completamente (se necesitan al menos hasta ${idxFraseLadle + 5}, hay ${lineas.length}).`);
-      }
-  }
-  // --- FIN LÓGICA FORMATO "LADLE_V5.6" ---
+} else { 
+  // fraseLadle no fue encontrada
+}
+   } }
+// --- FIN LÓGICA FORMATO "LADLE_V5.6" (Definitivo para Calvert MTR v3) ---
 
 
-  // --- INICIO LÓGICA PARA FORMATO "TENARIS" ---
 
+
+
+  // --- FIN LÓGICA FORMATO "LADLE_V5.6" (Revisado para Calvert) ---
+
+
+
+
+
+// --- INICIO LÓGICA PARA FORMATO "TENARIS" ---
   const fraseTenaris1 = "CHEMICAL COMPOSITION / CHEMISCHE ZUSAMMENSETZUNG";
   const fraseTenaris2 = "COMPOSITION % / ZUSAMMENSETZUNG %";
 
@@ -236,48 +511,42 @@ const divisoresTenarisPredeterminados = {
 
         let idxSimbolos = -1;
         let lineaSimbolosTexto = "";
+        // Aumentar ligeramente el rango de búsqueda para la línea de símbolos si es necesario
+        const RANGO_BUSQUEDA_SIMBOLOS_TENARIS = 30; 
 
-        const RANGO_BUSQUEDA_SIMBOLOS = 25;
-        if (DEBUG_THIS_FUNCTION) console.log(`  (TENARIS) Buscando línea de símbolos desde ${idxInicioSeccionTenaris + 1} hasta ${Math.min(idxInicioSeccionTenaris + RANGO_BUSQUEDA_SIMBOLOS + 1, lineas.length -1)}`);
-
-        for (let j = idxInicioSeccionTenaris + 1; j < Math.min(idxInicioSeccionTenaris + RANGO_BUSQUEDA_SIMBOLOS + 1, lineas.length); j++) {
-            const lineaActual = lineas[j]; // This is the raw line from the 'lineas' array for the current index j
+        for (let j = idxInicioSeccionTenaris + 1; j < Math.min(idxInicioSeccionTenaris + RANGO_BUSQUEDA_SIMBOLOS_TENARIS, lineas.length); j++) {
+            const lineaActual = lineas[j];
             if (!lineaActual || lineaActual.trim() === "") {
-                 if (DEBUG_THIS_FUNCTION) console.log(`  (TENARIS) Línea [${j}] está vacía, saltando.`);
+                 if (DEBUG_THIS_FUNCTION) console.log(`  (TENARIS) Buscando símbolos: Línea [${j}] vacía, saltando.`);
                  continue;
             }
-
-            // ***** ENHANCED DEBUGGING: Crucial for diagnosing symbol line issues *****
-            if (DEBUG_THIS_FUNCTION) {
-                // This log will show the exact content of 'lineaActual' (after trim and space normalization from 'lineas' array creation)
-                // that is being considered at each step. For the line index where you expect symbols (e.g., 387 from previous logs),
-                // this will reveal if it contains the full "H C Mn Si..." string or just "H".
-                console.log(`  (TENARIS) Verificando línea [${j}] para símbolos. Contenido procesado: "${lineaActual}" (Longitud: ${lineaActual.length})`);
-                // If issues persist, uncomment below to see character codes, helping to find non-standard spaces/invisible chars
-                // console.log(`      (TENARIS) Char codes for lineaActual [${j}]: ${lineaActual.split('').map(c => c.charCodeAt(0)).join(',')}`);
-            }
-            // ***** END ENHANCED DEBUGGING *****
-
-
-            if (lineaActual.toUpperCase().startsWith("X ")) { // Catches lines like "X 100", "X 1000"
-                 if (DEBUG_THIS_FUNCTION) console.log(`      Línea [${j}] (${lineaActual}) -> Parece ser de multiplicadores, saltando para símbolos.`);
+            if (DEBUG_THIS_FUNCTION) console.log(`  (TENARIS) Verificando línea [${j}] para símbolos: "${lineaActual}"`);
+            
+            if (lineaActual.toUpperCase().startsWith("X ")) {
+                 if (DEBUG_THIS_FUNCTION) console.log(`      Línea [${j}] -> Parece ser de multiplicadores, saltando.`);
                  continue;
             }
-            // Catches lines like "H 94 22..." or "P 93 21..." which are data lines, not symbol lines
-            if (/^(?:[A-Z0-9\/\s.-]*?\s+)?([HP])\s+((\s*\.?\d+)+)/i.test(lineaActual.toUpperCase()) || /^[HP]\s+\d/.test(lineaActual.toUpperCase())) {
-                if (DEBUG_THIS_FUNCTION) console.log(`      Línea [${j}] (${lineaActual}) -> Parece ser de valores (H/P + números), saltando para símbolos.`);
+            // Excluir líneas que claramente son de valores (H/P seguido de muchos números)
+            if (/^(?:[A-Z0-9\/\s.-]*?\s+)?[HP]\s+\.?\d/.test(lineaActual.toUpperCase())) {
+                 if (DEBUG_THIS_FUNCTION) console.log(`      Línea [${j}] -> Parece ser de valores H/P, saltando.`);
+                continue;
+            }
+            // Excluir líneas que sean solo "H Max Min" o "P Max Min" o variaciones
+            if (/^[HP]\s+(MAX|MIN)/i.test(lineaActual.toUpperCase())) {
+                if (DEBUG_THIS_FUNCTION) console.log(`      Línea [${j}] -> Parece ser línea de Max/Min, saltando.`);
                 continue;
             }
 
-            // Tokenize the current line. filter(Boolean) or filter(tok => tok.length > 0) removes empty strings from multiple spaces if any.
+
             const tokens = lineaActual.split(/\s+/).filter(Boolean);
             const potentialSymbolsInLine = tokens.filter(t =>
-                /^[A-Z][A-Z0-9]*(?:LF|L)?$/.test(t.toUpperCase()) && // Standard chemical symbol patterns
-                t.length <= 5 && // Symbols are generally short
+                /^[A-Z][A-Z0-9]*(?:LF|L)?$/.test(t.toUpperCase()) &&
+                t.length <= 5 && // Símbolos como Ce.1 podrían no pasar este filtro si "Ce.1" se tokeniza como uno solo.
+                                  // El regex de rawSymbolsRegexMatch es más robusto para esto.
                 !['HEAT', 'CHARGE', 'SAMPLE', 'PROBE', 'LOT', 'LOS', 'NR', 'TYPE', 'ANALYSE', 'ANALYSIS', 'TEST', 'WERKSTOFF', 'GRADE', 'MAX', 'MIN'].includes(t.toUpperCase())
             );
 
-            const commonSymbols = ['C', 'MN', 'SI', 'P', 'S', 'CR', 'NI']; // Key symbols to confirm it's a composition line
+            const commonSymbols = ['C', 'MN', 'SI', 'P', 'S', 'CR', 'NI'];
             let commonFoundCount = 0;
             potentialSymbolsInLine.forEach(ps => {
                 const cleanPs = ps.toUpperCase().replace('LF','').replace('L','');
@@ -287,168 +556,682 @@ const divisoresTenarisPredeterminados = {
             });
 
             if (DEBUG_THIS_FUNCTION) {
-                console.log(`      Línea [${j}] DEBUG: Tokens Originales: [${tokens.join('|')}], Símbolos Potenciales Filtrados: [${potentialSymbolsInLine.join('|')}], Símbolos Comunes Encontrados: ${commonFoundCount}`);
+                console.log(`      Línea [${j}] DEBUG Símbolos: Tokens: [${tokens.join('|')}], Potenciales: [${potentialSymbolsInLine.join('|')}], Comunes: ${commonFoundCount}`);
             }
 
-            // Criteria for identifying the symbol line:
-            // Needs a minimum number of potential symbols and a minimum number of common symbols.
-            if (potentialSymbolsInLine.length >= 5 && commonFoundCount >= 3) {
+            if (potentialSymbolsInLine.length >= 4 && commonFoundCount >= 2) { // Ajustado el umbral, a veces hay menos de 5 símbolos pero son los correctos
                  idxSimbolos = j;
-                 lineaSimbolosTexto = lineaActual; // Store the line that contains the symbols
+                 lineaSimbolosTexto = lineaActual;
                  if (DEBUG_THIS_FUNCTION) console.log(`  (TENARIS) ✅ Línea de Símbolos ENCONTRADA (idx ${idxSimbolos}): "${lineaSimbolosTexto}"`);
-                 break; // Found the symbol line, exit loop
-            } else if (DEBUG_THIS_FUNCTION) {
-                 console.log(`      Línea [${j}] NO CUMPLE CRITERIOS: Símbolos Potenciales=${potentialSymbolsInLine.length} (req >=5), Comunes Encontrados=${commonFoundCount} (req >=3)`);
+                 break; 
             }
         }
 
-        if (idxSimbolos === -1) {
-            if (DEBUG_THIS_FUNCTION) console.warn("⚠️ (TENARIS) No se encontró la línea de símbolos principal.");
-        } else {
-            // --- Improved symbol extraction from lineaSimbolosTexto to handle "CE LF" ---
-            const rawSymbolsRegexMatch = lineaSimbolosTexto.match(/[A-Z][A-Z0-9]*(?:\s*(?:LF|L))?/gi) || [];
+        if (idxSimbolos !== -1) {
+            const rawSymbolsRegexMatch = lineaSimbolosTexto.match(/[A-Z][A-Z0-9\.]*(?:\s*(?:LF|L))?/gi) || []; // Permitir puntos en símbolos como "Ce.1"
             let parsedSymbols = [];
             for (let i = 0; i < rawSymbolsRegexMatch.length; i++) {
-                let currentSymbolRaw = rawSymbolsRegexMatch[i];
-                // Clean the current symbol by making it uppercase and removing internal spaces (e.g. "CE LF" -> "CELF" if regex captured it that way, or "CE" -> "CE")
-                let currentSymbolClean = currentSymbolRaw.toUpperCase().replace(/\s+/g, '');
-
-                // Check if current symbol is "CE" and next is "LF"
+                let currentSymbolClean = rawSymbolsRegexMatch[i].toUpperCase().replace(/\s+/g, '');
                 if (currentSymbolClean === 'CE' && (rawSymbolsRegexMatch[i+1]?.toUpperCase().replace(/\s+/g,'')) === 'LF') {
-                    parsedSymbols.push('CE LF'); // Push combined "CE LF"
-                    i++; // Increment loop counter to skip the next token ('LF') as it's now combined
+                    parsedSymbols.push('CE LF'); i++;
                 } else {
-                    parsedSymbols.push(currentSymbolClean); // Push the symbol as is
+                    // Limpiar "Ce.1" a "CE" o manejarlo específicamente si tienes un mapeo para "CE.1"
+                    if (currentSymbolClean.endsWith('.')) currentSymbolClean = currentSymbolClean.slice(0,-1); // Quitar punto final si lo hay
+                    if (currentSymbolClean === 'CE.1') currentSymbolClean = 'CE'; // O mapElementos['CE.1'] = 'ce_lf'
+                    parsedSymbols.push(currentSymbolClean);
                 }
             }
-
-            
-            // Filter out non-symbol keywords again from the (potentially combined) list
-            const todosSimbolosTenaris = parsedSymbols.filter(s => /^[A-Z]/.test(s) && !['HEAT', 'CHARGE', 'SAMPLE', 'PROBE', 'LOT', 'LOS', 'NR', 'TYPE', 'ANALYSE', 'ANALYSIS', 'MAX', 'MIN'].includes(s.toUpperCase()));
-            // --- End improved symbol extraction ---
-
+            const todosSimbolosTenaris = parsedSymbols.filter(s => /^[A-Z]/.test(s) && !['HEAT', 'CHARGE', 'SAMPLE', 'MAX', 'MIN'].includes(s.toUpperCase()));
             if (DEBUG_THIS_FUNCTION) console.log(`  (TENARIS) Símbolos parseados de la línea (${todosSimbolosTenaris.length}): [${todosSimbolosTenaris.join(', ')}]`);
 
-            let valoresBrutos = null;
+            let valoresBrutos = null; 
             let tipoAnalisisSeleccionado = null;
-
-            // Search for value lines (H or P) after the symbol line
-            for (let k = idxSimbolos + 1; k < Math.min(idxSimbolos + 75, lineas.length); k++) {
-              if (!lineas[k] || lineas[k].trim() === "") {
-                  if (DEBUG_THIS_FUNCTION) console.log(`  (TENARIS) Buscando valores: Línea [${k}] vacía, saltando.`);
-                  continue;
-              }
+            // Rango de búsqueda para valores H/P
+            for (let k = idxSimbolos + 1; k < Math.min(idxSimbolos + 10, lineas.length); k++) {
+              if (!lineas[k] || lineas[k].trim() === "") continue;
               const lineaValoresPotencial = lineas[k];
-              if (DEBUG_THIS_FUNCTION) console.log(`  (TENARIS) Buscando valores: Verificando línea [${k}]: "${lineaValoresPotencial}"`);
-
-              const matchLineaValor = lineaValoresPotencial.match(/^(?:[A-Z0-9\/\s.-]*?\s+)?([HP])\s+(\d)/i);
-
-// Inside the loop for finding H/P values (k loop)
-// Before the 'if (matchLineaValor)'
-if (DEBUG_THIS_FUNCTION && lineaValoresPotencial.trim().startsWith('P ')) { // Or another pattern you see for P lines
-    console.log(`  (TENARIS DEBUG) Potential P-line [<span class="math-inline">\{k\}\]\: "</span>{lineaValoresPotencial}"`);
-    console.log(`      (TENARIS DEBUG) Regex test 1 (/^(?:[A-Z0-9\/\s.-]*?\s+)?([HP])\s+(\d)/i): ${/^(?:[A-Z0-9\/\s.-]*?\s+)?([HP])\s+(\d)/i.test(lineaValoresPotencial)}`);
-    console.log(`      (TENARIS DEBUG) Regex test 2 (/[HP]\s+((?:\s*\.?\d+)+)/i): ${/[HP]\s+((?:\s*\.?\d+)+)/i.test(lineaValoresPotencial)}`);
-}
+              if (DEBUG_THIS_FUNCTION) console.log(`  (TENARIS) Buscando valores H/P: Verificando línea [${k}]: "${lineaValoresPotencial}"`);
 
 
-              if (matchLineaValor) {
-                const tipoAnalisis = matchLineaValor[1].toUpperCase();
-                const valoresTextoMatch = lineaValoresPotencial.match(/[HP]\s+((?:\s*\.?\d+)+)/i);
-                if (!valoresTextoMatch || !valoresTextoMatch[1]) {
-                    if (DEBUG_THIS_FUNCTION) console.log(`    (TENARIS) Línea [${k}] coincide con H/P pero no se extrajeron números después.`);
-                    continue;
-                }
-                const valoresTexto = valoresTextoMatch[1].trim();
+
+
+              // Regex para identificar líneas que comienzan con H o P (posiblemente precedidas por Heat No, etc.)
+              // y son seguidas por una secuencia de números.
+              const matchHPLine = lineaValoresPotencial.match(/(?:^|\s)([HP])\s+((?:\.?\d+\s*)+)$/i);
+
+              if (matchHPLine) {
+                const tipoAnalisis = matchHPLine[1].toUpperCase();
+                const valoresTexto = matchHPLine[2].trim(); // El grupo de números
                 const numerosExtraidos = extraerNumerosDesdeTexto(valoresTexto, `(${formatoDetectado}) TENARIS Valores ${tipoAnalisis}:`);
-
-                if (DEBUG_THIS_FUNCTION) console.log(`    (TENARIS) Línea de Valores candidata (idx ${k}): Tipo: ${tipoAnalisis}, TextoValores: "${valoresTexto}", Números: [${numerosExtraidos.join(', ')}]`);
+                
+                if (DEBUG_THIS_FUNCTION) console.log(`    (TENARIS) Línea H/P candidata (idx ${k}): Tipo: ${tipoAnalisis}, TextoValores: "${valoresTexto}", Números: [${numerosExtraidos.join(', ')}]`);
 
                 if (numerosExtraidos.length > 0) {
-                    if (tipoAnalisis === 'P') { // Prefer 'P' (Product) analysis
+                    if (tipoAnalisis === 'P') {
                         valoresBrutos = numerosExtraidos;
                         tipoAnalisisSeleccionado = 'P (Producto)';
                         if (DEBUG_THIS_FUNCTION) console.log(`    (TENARIS) Análisis 'P' seleccionado. Valores: [${valoresBrutos.join(', ')}]`);
-                        break; // Found 'P' analysis, use this one
-                    } else if (tipoAnalisis === 'H' && !valoresBrutos) { // If 'P' not yet found, take 'H' (Heat)
+                        break; 
+                    } else if (tipoAnalisis === 'H' && !valoresBrutos) { 
                         valoresBrutos = numerosExtraidos;
                         tipoAnalisisSeleccionado = 'H (Cuchara)';
                         if (DEBUG_THIS_FUNCTION) console.log(`    (TENARIS) Análisis 'H' temporalmente seleccionado. Valores: [${valoresBrutos.join(', ')}]`);
-                        // Continue searching in case a 'P' line follows
                     }
                 }
               } else if (DEBUG_THIS_FUNCTION) {
-                  console.log(`    (TENARIS) Línea [${k}] no coincide con patrón de valores H/P.`);
+                  console.log(`    (TENARIS) Línea [${k}] NO coincide con patrón de valores H/P (Regex principal).`);
               }
             }
 
-            if (!valoresBrutos || valoresBrutos.length === 0) {
-              if (DEBUG_THIS_FUNCTION) console.warn("⚠️ (TENARIS) No se encontraron valores numéricos para análisis H o P.");
-            } else {
-                if (DEBUG_THIS_FUNCTION) {
-                    console.log(`✅ (TENARIS) Usando análisis tipo "${tipoAnalisisSeleccionado}"`);
-                    console.log(`✅ (TENARIS) Valores brutos extraídos (${valoresBrutos.length}): [${valoresBrutos.join(', ')}]`);
+
+
+
+            
+// --- INICIO LÓGICA PARA FORMATO "TENARIS" ---
+// (Las frases de detección y bucle para encontrar idxInicioSeccionTenaris se mantienen como las tenías)
+// ...
+// (El bucle para encontrar idxSimbolos y lineaSimbolosTexto se mantiene como lo tenías)
+// ...
+// (El parseo de lineaSimbolosTexto para obtener todosSimbolosTenaris se mantiene)
+// ...
+// (El bucle para encontrar las líneas de valores H/P y obtener valoresBrutos y tipoAnalisisSeleccionado se mantiene)
+// ...
+
+ if (valoresBrutos && valoresBrutos.length > 0 && todosSimbolosTenaris.length > 0) {
+            if (DEBUG_THIS_FUNCTION) {
+                console.log(`✅ (TENARIS Modificado) Usando análisis tipo "${tipoAnalisisSeleccionado}"`);
+                console.log(`✅ (TENARIS Modificado) Símbolos parseados (${todosSimbolosTenaris.length}): [${todosSimbolosTenaris.join(', ')}]`);
+                console.log(`✅ (TENARIS Modificado) Valores brutos extraídos (${valoresBrutos.length}): [${valoresBrutos.join(', ')}]`);
+            }
+            composicion.valoresDescartados = [];
+
+            let valorIdx = 0;
+            let simboloIdx = 0;
+            let firstAlContextProcessed = false; // Para rastrear si el primer contexto de 'Al' (ya sea 'Al sol' o 'Al' solo) ha sido procesado
+
+            while (simboloIdx < todosSimbolosTenaris.length) {
+                if (valorIdx >= valoresBrutos.length) {
+                    if (DEBUG_THIS_FUNCTION) console.log(`(TENARIS Modificado) No hay más valores para el símbolo ${todosSimbolosTenaris[simboloIdx]} y los siguientes.`);
+                    break;
                 }
+
+                const currentSymbolRaw = todosSimbolosTenaris[simboloIdx];
+                const currentSymbolUpper = currentSymbolRaw.toUpperCase();
+                let targetClave;
+                let rawValue = valoresBrutos[valorIdx];
+                let divisor = 1;
+                let symbolsConsumedThisIteration = 1;
+                let symbolForLog = currentSymbolRaw;
+
+                if (currentSymbolUpper === 'AL' && (todosSimbolosTenaris[simboloIdx + 1]?.toUpperCase() === 'SOL')) {
+                    // Interpretación confirmada: "Al" y "sol" juntos = "Aluminio Soluble", toma el valor en la posición de "Al".
+                    targetClave = mapElementos['SOL']; // Mapea a 'aluminioSoluble'
+                    divisor = 100; // "Al" está en la columna X100
+                    symbolsConsumedThisIteration = 2; // Se consumen "Al" y "sol"
+                    symbolForLog = `${currentSymbolRaw} ${todosSimbolosTenaris[simboloIdx + 1]}`;
+                    firstAlContextProcessed = true; // El primer contexto de Aluminio ha sido procesado
+                    if (DEBUG_THIS_FUNCTION) console.log(`  (TENARIS Modificado) Par "Al sol" detectado para ${targetClave}.`);
+                } else {
+                    // Procesamiento estándar para otros símbolos
+                    targetClave = mapElementos[currentSymbolUpper];
+                    if (targetClave) {
+                        if (['C', 'MN', 'SI', 'CR', 'MO', 'CU'].includes(currentSymbolUpper)) {
+                            divisor = 100;
+                        } else if (currentSymbolUpper === 'AL') { // Un "Al" independiente
+                            if (!firstAlContextProcessed) { // Es el primer "Al" (y es independiente)
+                                divisor = 100;
+                                firstAlContextProcessed = true;
+                            } else { // Es el segundo (o posterior) "Al" independiente
+                                divisor = 1000;
+                            }
+                        } else if (currentSymbolUpper === 'SOL') { // "sol" independiente (no debería ocurrir si "Al sol" es la norma)
+                            divisor = 100;
+                            if (DEBUG_THIS_FUNCTION) console.warn(`  (TENARIS Modificado) Procesando 'SOL' como símbolo independiente.`);
+                        } else if (['P', 'NI', 'V', 'SN', 'AS', 'NB', 'TI', 'PB', 'SB', 'CO', 'S'].includes(currentSymbolUpper)) {
+                            divisor = 1000;
+                        } else if (['ZR', 'BI', 'CA', 'B', 'N', 'MG', 'W'].includes(currentSymbolUpper)) {
+                            divisor = 10000;
+                        } else if (['CE LF', 'CEL', 'CELF', 'CE'].includes(currentSymbolUpper)) {
+                            divisor = 100; // Ce.1 está bajo X100 en el MTR
+                        } else {
+                            divisor = divisoresTenarisPredeterminados[currentSymbolUpper] || 1; // Fallback
+                            if (DEBUG_THIS_FUNCTION && divisor === 1 && currentSymbolUpper !== '') console.warn(`  (TENARIS Modificado) Símbolo ${currentSymbolUpper} usó divisor de fallback 1.`);
+                        }
+                    }
+                }
+
+                if (targetClave && rawValue !== undefined && !isNaN(rawValue) && divisor !== 0) {
+                    const correctedValue = rawValue / divisor;
+                    composicion[targetClave] = parseFloat(correctedValue.toFixed(6));
+                    if (DEBUG_THIS_FUNCTION) {
+                        console.log(`  (TENARIS Modificado) Asignado: ${targetClave} = ${composicion[targetClave]} (Crudo: ${rawValue}, Símbolo(s): ${symbolForLog}, Divisor: ${divisor})`);
+                    }
+                } else if (!targetClave && currentSymbolRaw) {
+                    if (DEBUG_THIS_FUNCTION) console.warn(`🚫 (TENARIS Modificado) Símbolo ${symbolForLog} (${currentSymbolRaw}) no mapeado o sin clave destino. Se salta su valor correspondiente.`);
+                } else if (targetClave && (rawValue === undefined || isNaN(rawValue))) {
+                    if (DEBUG_THIS_FUNCTION) console.warn(`📉 (TENARIS Modificado) Símbolo ${symbolForLog} (clave: ${targetClave}) con valor crudo no numérico/undefined (${rawValue}).`);
+                }
+
+                simboloIdx += symbolsConsumedThisIteration;
+                valorIdx++; // Siempre se consume un valor de `valoresBrutos` en cada iteración del bucle while principal.
+            }
+
+            if (valorIdx < valoresBrutos.length) { // Si sobran valores después de procesar todos los símbolos
+                const descartadosAlFinal = valoresBrutos.slice(valorIdx);
+                if (descartadosAlFinal.length > 0) {
+                    composicion.valoresDescartados.push(...descartadosAlFinal);
+                    if (DEBUG_THIS_FUNCTION) console.warn(`✂️ (TENARIS Modificado) Valores numéricos descartados al final (exceso de valores no mapeados a símbolos): ${descartadosAlFinal.join(', ')}`);
+                }
+            }
+        } else if (DEBUG_THIS_FUNCTION) {
+            if (todosSimbolosTenaris.length === 0) {
+                console.warn("⚠️ (TENARIS Modificado) No se parsearon símbolos, no se puede asignar composición.");
+            } else if (!valoresBrutos || valoresBrutos.length === 0) {
+                console.warn("⚠️ (TENARIS Modificado) No se encontraron valores numéricos válidos para H o P.");
+            }
+        }
+
+
+
+
+           } 
+    else if (DEBUG_THIS_FUNCTION) { 
+        console.warn("⚠️ (TENARIS) No se encontró la línea de símbolos principal después de la detección inicial del formato.");
+    }
+} // Fin if (seccionTenarisEncontrada)
+           
+  }
+  // --- FIN Lógica Formato TENARIS ---
+
+
+
+
+
+
+
+  // --- INICIO LÓGICA FORMATO "TABLA_SIMPLE_CON_HEAT" (Cleveland-Cliffs y similares) ---
+  if (!formatoDetectado) {
+    let idxHeatWtPercent = -1;
+    let idxSimbolosCleveland = -1;
+    let idxValoresCleveland = -1;
+    let heatNumberExtraido = null;
+
+    for (let i = 0; i < lineas.length; i++) {
+      if (lineas[i].toUpperCase().includes("HEAT (WT.%)")) {
+        idxHeatWtPercent = i;
+        let potentialSymbolLineIndex = -1;
+        let potentialValueLineIndex = -1;
+
+        // Intenta: Símbolos en la misma línea que "HEAT (WT.%)", valores en la siguiente
+        if (lineas.length > i + 1) {
+            const currentLineSymbolsCheck = ['C', 'MN', 'P', 'S', 'SI'].every(s => lineas[i].toUpperCase().includes(s));
+            const nextLineStartsWithHeatNo = /\d{6,}/.test(lineas[i+1].trim().split(/\s+/)[0]);
+            if (currentLineSymbolsCheck && nextLineStartsWithHeatNo) {
+                potentialSymbolLineIndex = i;
+                potentialValueLineIndex = i + 1;
+            }
+        }
+        
+        // Intenta: Símbolos en la línea SIGUIENTE a "HEAT (WT.%)", valores en la línea después de eso
+        if (potentialSymbolLineIndex === -1 && lineas.length > i + 2) {
+            const nextLineSymbolsCheck = ['C', 'MN', 'P', 'S', 'SI'].every(s => lineas[i+1].toUpperCase().includes(s));
+            const twoLinesDownStartsWithHeatNo = /\d{6,}/.test(lineas[i+2].trim().split(/\s+/)[0]);
+            if (nextLineSymbolsCheck && twoLinesDownStartsWithHeatNo) {
+                potentialSymbolLineIndex = i + 1;
+                potentialValueLineIndex = i + 2;
+            }
+        }
+
+        if (potentialSymbolLineIndex !== -1) {
+            idxSimbolosCleveland = potentialSymbolLineIndex;
+            idxValoresCleveland = potentialValueLineIndex;
+            formatoDetectado = "TABLA_SIMPLE_CON_HEAT";
+            if (DEBUG_THIS_FUNCTION) console.log(`🎯 Formato detectado: "${formatoDetectado}" por encabezado en línea ${idxHeatWtPercent}. Símbolos en línea ${idxSimbolosCleveland}, Valores en línea ${idxValoresCleveland}`);
+            break; 
+        }
+      }
+    }
+
+// CLIFF
+
+    if (formatoDetectado === "TABLA_SIMPLE_CON_HEAT") {
+      const lineaSimbolosBruta = lineas[idxSimbolosCleveland];
+      const lineaValoresBruta = lineas[idxValoresCleveland];
+      let valoresNumericos = [];
+
+      if (DEBUG_THIS_FUNCTION) {
+        console.log(`  (${formatoDetectado}) Línea Símbolos Bruta (idx ${idxSimbolosCleveland}): "${lineaSimbolosBruta}"`);
+        console.log(`  (${formatoDetectado}) Línea Valores Bruta (idx ${idxValoresCleveland}): "${lineaValoresBruta}"`);
+      }
+
+      // Procesar línea de valores PRIMERO para obtener el Heat No. y los números puros
+      const tokensValores = lineaValoresBruta.trim().split(/\s+/).filter(v => v.length > 0);
+      if (tokensValores.length > 0 && /\d{6,}/.test(tokensValores[0])) {
+        heatNumberExtraido = tokensValores[0];
+        if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) Heat Number extraído: ${heatNumberExtraido}`);
+        valoresNumericos = tokensValores.slice(1).map(v => parseFloat(v)).filter(v => !isNaN(v));
+      } else {
+        if (DEBUG_THIS_FUNCTION) console.warn(`⚠️ (${formatoDetectado}) No se pudo extraer Heat Number o la línea de valores no comenzó con él. Intentando parsear todos los tokens como valores.`);
+        valoresNumericos = tokensValores.map(v => parseFloat(v)).filter(v => !isNaN(v));
+      }
+      
+      if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) Valores Numéricos Extraídos (${valoresNumericos.length}): [${valoresNumericos.join(', ')}]`);
+      
+      // Para el formato Cleveland-Cliffs (y similares con tabla simple),
+      // definimos el orden esperado de símbolos según el PDF visual.
+      // Esto es más robusto si la línea de símbolos extraída por pdftotext es incompleta.
+
+
+ // Usar los símbolos REALMENTE extraídos por pdftotext de la línea de símbolos
+      const simbolosTextoExtraido = lineaSimbolosBruta.replace(/HEAT\s*\(WT\.?%\)\s*/i, '').trim();
+      const simbolosDetectadosExtraidos = simbolosTextoExtraido.split(/\s+/).filter(s => s.length > 0);
+
+      if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) Símbolos Detectados de Línea Bruta (${simbolosDetectadosExtraidos.length}): [${simbolosDetectadosExtraidos.join(', ')}]`);
+
+      composicion.valoresDescartados = [];
+      if (simbolosDetectadosExtraidos.length !== valoresNumericos.length && DEBUG_THIS_FUNCTION) {
+        console.warn(`⚠️ (${formatoDetectado}) Desajuste: Símbolos Detectados de Línea Bruta (${simbolosDetectadosExtraidos.length}) vs Valores Numéricos Extraídos (${valoresNumericos.length}).`);
+        if (valoresNumericos.length > simbolosDetectadosExtraidos.length) {
+            const descartados = valoresNumericos.slice(simbolosDetectadosExtraidos.length);
+            composicion.valoresDescartados.push(...descartados);
+            if (DEBUG_THIS_FUNCTION) console.warn(`✂️ (${formatoDetectado}) Valores numéricos descartados (exceso): ${descartados.join(', ')}`);
+        } else {
+            const simbolosSinValor = simbolosDetectadosExtraidos.slice(valoresNumericos.length);
+            if (DEBUG_THIS_FUNCTION) console.warn(`📉 (${formatoDetectado}) Símbolos detectados de línea bruta sin valor numérico asignado: ${simbolosSinValor.join(', ')}`);
+        }
+      }
+      
+      const minLength = Math.min(simbolosDetectadosExtraidos.length, valoresNumericos.length);
+      for (let k = 0; k < minLength; k++) {
+        let simUpperOriginal = simbolosDetectadosExtraidos[k].toUpperCase();
+        // No necesitamos el mapeo CB a NB aquí si CB ya está en mapElementos,
+        // pero es bueno tenerlo si 'CB' es una variante que quieres mapear a 'niobio' (cuya clave es NB).
+        let simUpperParaMapeo = simUpperOriginal;
+        if (simUpperOriginal === 'CB' && mapElementos['NB']) { // Si existe NB como clave preferida para Niobio
+            simUpperParaMapeo = 'NB'; 
+        } else if (!mapElementos[simUpperOriginal] && mapElementos[simUpperOriginal.replace('.', '')]) { // Intentar quitar puntos (ej. MN.)
+            simUpperParaMapeo = simUpperOriginal.replace('.', '');
+        }
+        
+        const clave = mapElementos[simUpperParaMapeo];
+        let valor = valoresNumericos[k];
+      
+        if (clave && valor !== undefined && !isNaN(valor)) {
+          if ((simUpperOriginal === 'MN' || simUpperOriginal === 'MN.') && valor > 1 && valor < 100) { 
+              valor = valor / 100;
+              if (DEBUG_THIS_FUNCTION) console.log(`      Aplicada corrección heurística a MN: ${valoresNumericos[k]} -> ${valor}`);
+          }
+          composicion[clave] = parseFloat(Number(valor).toFixed(6));
+          if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) Asignado (de línea símbolos): ${clave} (Símbolo Original: ${simbolosDetectadosExtraidos[k]}) = ${composicion[clave]}`);
+        } else if (!clave && DEBUG_THIS_FUNCTION) {
+            console.warn(`🚫 (${formatoDetectado}) Símbolo detectado "${simbolosDetectadosExtraidos[k]}" (mapeado a "${simUpperParaMapeo}") no tiene entrada en mapElementos.`);
+        } else if (clave && (valor === undefined || isNaN(valor)) && DEBUG_THIS_FUNCTION) {
+            console.warn(`📉 (${formatoDetectado}) Símbolo detectado "${simbolosDetectadosExtraidos[k]}" (clave: ${clave}) no tiene un valor numérico válido (valor: ${valor}).`);
+        }
+      }
+
+
+
+      const elementosEsperados = ['carbono', 'manganeso', 'fosforo', 'azufre', 'silicio', 'titanio', 'nitrogeno', 'boro', 'cobre', 'niquel', 'molibdeno', 'cromo', 'niobio', 'vanadio', 'aluminio', 'estaño'];
+      const faltantes = elementosEsperados.filter(el => composicion[el] === null);
+      if (faltantes.length > 0 && DEBUG_THIS_FUNCTION) {
+          console.warn(`🟡 (${formatoDetectado}) Algunos elementos clave esperados aún son null después del parseo: ${faltantes.join(', ')}. Esto puede ser normal si el MTR no los reporta o si el desajuste símbolo-valor fue grande.`);
+      }
+    }
+  }
+  // --- FIN LÓGICA FORMATO "TABLA_SIMPLE_CON_HEAT" ---
+
+
+// --- INICIO LÓGICA FORMATO "GENERIC_CHEMICAL_ANALYSIS" ---
+
+
+// --- INICIO LÓGICA FORMATO "GENERIC_CHEMICAL_ANALYSIS" ---
+if (!formatoDetectado) {
+    const fraseGenericChem = "CHEMICAL ANALYSIS";
+    const fraseGenericChemEs = "ANÁLISIS QUÍMICO"; // From PDF source 27
+    let idxFraseGenericChem = -1;
+    let idxLineaSimbolosGeneric = -1;
+    let idxLineaValoresGeneric = -1;
+
+    for (let i = 0; i < lineas.length; i++) {
+        const lineaUpper = lineas[i].toUpperCase();
+        if (lineaUpper.includes(fraseGenericChem) || lineaUpper.includes(fraseGenericChemEs)) {
+            idxFraseGenericChem = i;
+            if (DEBUG_THIS_FUNCTION) console.log(`🎯 Potencial formato "GENERIC_CHEMICAL_ANALYSIS" por encabezado en línea ${idxFraseGenericChem} ("${lineas[idxFraseGenericChem]}").`);
+
+            let symbolLineCandidateIdx = -1;
+            // Search for symbol line within a few lines after the header
+            for (let j = idxFraseGenericChem + 1; j < Math.min(idxFraseGenericChem + 4, lineas.length); j++) {
+                if (lineas[j] && lineas[j].trim() !== "") {
+                    const testTokens = lineas[j].trim().split(/\s+/);
+                    const commonElements = ["C", "MN", "P", "S", "SI", "AL", "CU", "HEAT"]; // Include "HEAT" as it's often on this line
+                    let foundCount = 0;
+                    let hasHeatKeyword = false;
+                    testTokens.forEach(token => {
+                        const cleanTokenUpper = token.toUpperCase().replace(/[():%]/g, '');
+                        if (mapElementos[cleanTokenUpper]) foundCount++;
+                        if (cleanTokenUpper === "HEAT") hasHeatKeyword = true;
+                    });
+                    // Expect several chemical symbols OR a common keyword like "HEAT" and at least one symbol
+                    if (foundCount >= 3 || (hasHeatKeyword && foundCount >=1)) {
+                        symbolLineCandidateIdx = j;
+                        if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado || "GENERIC_CHEMICAL_ANALYSIS"}) Línea de símbolos candidata (idx ${j}): "${lineas[j]}" (Common symbols found: ${foundCount})`);
+                        break;
+                    }
+                }
+            }
+
+            if (symbolLineCandidateIdx !== -1) {
+                // Look for the values line immediately after the symbol line (or skip one empty line)
+                if (lineas.length > symbolLineCandidateIdx + 1 && lineas[symbolLineCandidateIdx + 1] && lineas[symbolLineCandidateIdx + 1].trim() !== "") {
+                    idxLineaSimbolosGeneric = symbolLineCandidateIdx;
+                    idxLineaValoresGeneric = symbolLineCandidateIdx + 1;
+                } else if (lineas.length > symbolLineCandidateIdx + 2 && lineas[symbolLineCandidateIdx + 2] && lineas[symbolLineCandidateIdx + 2].trim() !== "") {
+                    // Assuming one empty line might be between symbols and values
+                     idxLineaSimbolosGeneric = symbolLineCandidateIdx;
+                     idxLineaValoresGeneric = symbolLineCandidateIdx + 2;
+                     if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado || "GENERIC_CHEMICAL_ANALYSIS"}) Saltada línea vacía entre símbolos y valores.`);
+                }
+
+
+                if (idxLineaSimbolosGeneric !== -1 && idxLineaValoresGeneric !== -1) {
+                    formatoDetectado = "GENERIC_CHEMICAL_ANALYSIS"; // Confirm format
+                    if (DEBUG_THIS_FUNCTION) {
+                        console.log(`🎯 Formato confirmado: "${formatoDetectado}".`);
+                        console.log(`  (${formatoDetectado}) Línea Símbolos (idx ${idxLineaSimbolosGeneric}): "${lineas[idxLineaSimbolosGeneric]}"`);
+                        console.log(`  (${formatoDetectado}) Línea Valores (idx ${idxLineaValoresGeneric}): "${lineas[idxLineaValoresGeneric]}"`);
+                    }
+                    break; // Exit main loop once format is detected and lines are set
+                } else {
+                     if (DEBUG_THIS_FUNCTION) console.log(`  (GENERIC_CHEMICAL_ANALYSIS) No se pudo confirmar la línea de valores después de la línea de símbolos candidata ${symbolLineCandidateIdx}.`);
+                }
+            } else {
+                if (DEBUG_THIS_FUNCTION) console.log(`  (GENERIC_CHEMICAL_ANALYSIS) No se encontró una línea de símbolos convincente después del encabezado en línea ${idxFraseGenericChem}.`);
+            }
+        }
+    }
+
+    if (formatoDetectado === "GENERIC_CHEMICAL_ANALYSIS") {
+        const lineaSimbolosCompleta = lineas[idxLineaSimbolosGeneric];
+        const lineaValoresCompleta = lineas[idxLineaValoresGeneric];
+
+        const tokensSimbolosAll = lineaSimbolosCompleta.trim().split(/\s+/).filter(s => s.length > 0);
+        const originalTokensValores = lineaValoresCompleta.trim().split(/\s+/).filter(v => v.length > 0);
+
+        let firstElementSymbolIndex = -1;
+        // Find the start of chemical symbols in the symbol line (e.g., after "Heat")
+        for (let i = 0; i < tokensSimbolosAll.length; i++) {
+            const tokenUpper = tokensSimbolosAll[i].toUpperCase().replace(/[():%]/g, '');
+            if (mapElementos[tokenUpper]) {
+                firstElementSymbolIndex = i;
+                if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) Primer símbolo químico "${tokensSimbolosAll[i]}" encontrado en la línea de símbolos en el índice ${i}.`);
+                break;
+            }
+        }
+
+        if (firstElementSymbolIndex === -1) {
+            if (DEBUG_THIS_FUNCTION) console.warn(`⚠️ (${formatoDetectado}) No se pudo determinar el inicio de los símbolos químicos en: "${lineaSimbolosCompleta}"`);
+            formatoDetectado = null; // Critical failure
+        } else {
+            const simbolosDetectados = tokensSimbolosAll.slice(firstElementSymbolIndex);
+            if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) Símbolos Relevantes Detectados (${simbolosDetectados.length}): [${simbolosDetectados.join(', ')}]`);
+
+            let firstChemicalValueIndexInValuesLine = -1;
+            // Heuristic: Find the Heat ID in originalTokensValores. Values start after it.
+            // Heat ID often contains letters and numbers. e.g., A505067 [cite: 5]
+            // It's often the last non-purely-numeric token before pure chemical values.
+            let heatIdCandidate = "";
+            for(let i=0; i < firstElementSymbolIndex && i < originalTokensValores.length; i++){ // Check tokens before where symbols start
+                // A simple check for Heat ID: alphanumeric and not 'kg', 'lb', etc.
+                 if (/[A-Z]/i.test(originalTokensValores[i]) && /\d/.test(originalTokensValores[i]) && !/KG|LB/i.test(originalTokensValores[i].toUpperCase())) {
+                    heatIdCandidate = originalTokensValores[i];
+                 }
+            }
+            if (heatIdCandidate) {
+                const heatIdIndex = originalTokensValores.indexOf(heatIdCandidate);
+                if (heatIdIndex !== -1 && heatIdIndex + 1 < originalTokensValores.length) {
+                    firstChemicalValueIndexInValuesLine = heatIdIndex + 1;
+                    if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) Heat ID "${heatIdCandidate}" encontrado en línea de valores en índice ${heatIdIndex}. Valores comenzarán desde el índice ${firstChemicalValueIndexInValuesLine}.`);
+                }
+            }
+
+            // Fallback if Heat ID method fails: count non-numeric leading tokens in values line
+            if (firstChemicalValueIndexInValuesLine === -1) {
+                let leadingTokensCount = 0;
+                for (let i = 0; i < originalTokensValores.length; i++) {
+                    // A simple check: if it's not a number and not "<", it's likely a leading token
+                    // This is a weak heuristic and might need adjustment.
+                    // Example leading tokens: "25L579676A", "41,757", "lb.", "18,940.6791", "kg", "A505067" [cite: 5]
+                    if (isNaN(parseFloat(originalTokensValores[i].replace(',','.'))) && originalTokensValores[i] !== "<") {
+                        leadingTokensCount++;
+                    } else {
+                        // If current token IS a number or "<", assume previous ones were all leading.
+                        // This can be problematic if weight numbers appear before Heat ID.
+                        // A better fallback: the number of prefix tokens in symbol line.
+                        if (i >= firstElementSymbolIndex && firstElementSymbolIndex < originalTokensValores.length) { // If symbol line prefix is shorter
+                           firstChemicalValueIndexInValuesLine = firstElementSymbolIndex; // Use symbol line's prefix count
+                           if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) Fallback: Usando el conteo de prefijo de la línea de símbolos (${firstElementSymbolIndex}) para la línea de valores.`);
+                           break;
+                        } else if (originalTokensValores.length - i >= simbolosDetectados.filter(s=>mapElementos[s.toUpperCase().replace(/[():%]/g, '')]).length) {
+                           // If remaining tokens match expected number of chemical values
+                           firstChemicalValueIndexInValuesLine = i;
+                           if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) Fallback: Inicio de valores por conteo de tokens restantes en línea ${i}.`);
+                           break;
+                        }
+                    }
+                }
+                 if (firstChemicalValueIndexInValuesLine === -1 && originalTokensValores.length > 0) { // Default if still not found
+                    firstChemicalValueIndexInValuesLine = (originalTokensValores.length - simbolosDetectados.length > 0) ? originalTokensValores.length - simbolosDetectados.length : 0;
+                    if (firstChemicalValueIndexInValuesLine < 0) firstChemicalValueIndexInValuesLine = 0;
+                    if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) Fallback extremo: Inicio de valores por cálculo de longitud en índice ${firstChemicalValueIndexInValuesLine}.`);
+                 }
+            }
+             // Validate the calculated index. For the example log, it should be around index 6 for originalTokensValores
+             // PDF (source MTR_EJEMPLO_STEEL_2.pdf, page 2, source 12): "25L579676A", "41,757", "lb.", "18,940.6791", "kg", "A505067", ".05" <- .05 is 7th item, index 6
+            if (originalTokensValores.indexOf("A505067") !== -1) { // Specific check for provided MTR example
+                 firstChemicalValueIndexInValuesLine = originalTokensValores.indexOf("A505067") + 1;
+                 if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) Ajuste específico para MTR: Índice de inicio de valores ajustado a ${firstChemicalValueIndexInValuesLine} después de Heat ID 'A505067'.`);
+            }
+
+
+            if (firstChemicalValueIndexInValuesLine === -1 || firstChemicalValueIndexInValuesLine >= originalTokensValores.length) {
+                if (DEBUG_THIS_FUNCTION) console.warn(`⚠️ (${formatoDetectado}) No se pudo determinar el inicio de los valores químicos en la línea de valores: "${lineaValoresCompleta}"`);
+                formatoDetectado = null; // Critical failure
+            } else {
+                const valoresCrudosParaMapeo = originalTokensValores.slice(firstChemicalValueIndexInValuesLine);
+                if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) Valores Crudos Relevantes para Mapeo (${valoresCrudosParaMapeo.length}): [${valoresCrudosParaMapeo.join(', ')}]`);
+
+                const processedValores = [];
+                let tempIdx = 0;
+                while (tempIdx < valoresCrudosParaMapeo.length) {
+                    if (valoresCrudosParaMapeo[tempIdx] === "<" && (tempIdx + 1 < valoresCrudosParaMapeo.length)) {
+                        processedValores.push(valoresCrudosParaMapeo[tempIdx] + " " + valoresCrudosParaMapeo[tempIdx + 1]);
+                        tempIdx += 2;
+                    } else {
+                        processedValores.push(valoresCrudosParaMapeo[tempIdx]);
+                        tempIdx += 1;
+                    }
+                }
+                if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) Valores Procesados (manejo de '<') (${processedValores.length}): [${processedValores.join(', ')}]`);
 
                 composicion.valoresDescartados = [];
-                 if (todosSimbolosTenaris.length > 0 && valoresBrutos.length > 0 && todosSimbolosTenaris.length !== valoresBrutos.length) {
-                    if (DEBUG_THIS_FUNCTION) console.warn(`⚠️ (TENARIS) Desajuste: Símbolos (${todosSimbolosTenaris.length}) vs Valores (${valoresBrutos.length}) para tipo "${tipoAnalisisSeleccionado}".`);
-                    if (valoresBrutos.length > todosSimbolosTenaris.length) {
-                        const descartados = valoresBrutos.slice(todosSimbolosTenaris.length);
-                        composicion.valoresDescartados.push(...descartados);
-                        if (DEBUG_THIS_FUNCTION) console.warn(`✂️ (TENARIS) Valores descartados (exceso): ${descartados.join(', ')}`);
-                    } else {
-                        if (DEBUG_THIS_FUNCTION) console.warn(`📉 (TENARIS) Faltan ${todosSimbolosTenaris.length - valoresBrutos.length} valores para los símbolos: ${todosSimbolosTenaris.slice(valoresBrutos.length).join(', ')}`);
+                const minLength = Math.min(simbolosDetectados.length, processedValores.length);
+
+                for (let k = 0; k < minLength; k++) {
+                    const simOriginal = simbolosDetectados[k];
+                    const simUpper = simOriginal.toUpperCase().replace(/[():%]/g, '');
+                    const clave = mapElementos[simUpper];
+                    let valorStr = processedValores[k];
+
+                    if (clave) {
+                        let valorNum;
+                        if (valorStr.startsWith("<")) { // e.g., "< .001" [cite: 5, 6]
+                            const parts = valorStr.split(/\s+/); // Split by space
+                            if (parts.length > 1 && !isNaN(parseFloat(parts[1].replace(',','.')))) {
+                                valorNum = parseFloat(parts[1].replace(',','.')) * 0.5; // Or other rule, like parts[1] directly if "<" means "up to"
+                                if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) Valor "<" detectado y procesado: "${valorStr}" -> ${valorNum}`);
+                            } else {
+                                valorNum = NaN; // Could not parse number after "<"
+                                if (DEBUG_THIS_FUNCTION) console.warn(`  (${formatoDetectado}) Valor "<" detectado pero no se pudo parsear el número: "${valorStr}"`);
+                            }
+                        } else {
+                            valorNum = parseFloat(valorStr.replace(',','.').replace(/[^\d.-]/g, '')); // Clean non-numeric, ensure comma is dot
+                        }
+
+                        if (!isNaN(valorNum)) {
+                            composicion[clave] = parseFloat(Number(valorNum).toFixed(6));
+                            if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) Asignado: ${clave} (${simOriginal}) = ${composicion[clave]}`);
+                        } else if (DEBUG_THIS_FUNCTION) {
+                            console.warn(`📉 (${formatoDetectado}) Valor no numérico para ${simOriginal} (clave: ${clave}): "${processedValores[k]}" (Parseado como: ${valorNum})`);
+                        }
+                    } else if (DEBUG_THIS_FUNCTION && simUpper !== "C(EQ)") { // C(EQ) is expected not to map [cite: 7]
+                        console.warn(`🚫 (${formatoDetectado}) Símbolo "${simOriginal}" (limpio: "${simUpper}") no tiene mapeo en mapElementos.`);
                     }
                 }
 
-                const minLength = Math.min(todosSimbolosTenaris.length, valoresBrutos.length);
-                for (let k=0; k < minLength; k++) {
-                  const simboloMapear = todosSimbolosTenaris[k]; // This is the cleaned symbol, e.g., "C", "MN", "CE LF"
-                        // Inside the loop where you assign composicion values:
-                    
-                    // Add this debug for the specific token:
-                    if (simboloMapear === 'CE LF' || simboloMapear === 'CELF' || simboloMapear === 'CEL') {
-                        console.log(`(TENARIS DEBUG) For CE/LF related token: simboloMapear is "${simboloMapear}" (length: ${simboloMapear.length})`);
-                        console.log(`(TENARIS DEBUG) mapElementos['CE LF'] exists: ${'CE LF' in mapElementos}`);
-                        console.log(`(TENARIS DEBUG) mapElementos['CELF'] exists: ${'CELF' in mapElementos}`);
-                        console.log(`(TENARIS DEBUG) mapElementos['CEL'] exists: ${'CEL' in mapElementos}`);
-                    }
-
-                    let clave = mapElementos[simboloMapear];
-                    if (simboloMapear === 'CE LF' || simboloMapear === 'CELF' || simboloMapear === 'CEL') {
-                        console.log(`(TENARIS DEBUG) Clave found for "${simboloMapear}": ${clave}`);
-                    }
-                  
-
-                  // Fallbacks for legacy or alternative symbols like S1, F1
-                  if (!clave && simboloMapear === 'S1') clave = mapElementos['SI']; // Note: mapElementos keys are uppercase
-                  if (!clave && simboloMapear === 'F1') clave = mapElementos['P'];
-
-                  let valorCrudo = valoresBrutos[k];
-
-                  if (clave && valorCrudo !== undefined && !isNaN(valorCrudo)) {
-                    // Divisor lookup should use the same symbol key used for mapElementos
-                    const divisor = divisoresTenarisPredeterminados[simboloMapear] || 100;
-
-                    const valorCorregido = valorCrudo / divisor;
-                    composicion[clave] = parseFloat(valorCorregido.toFixed(6));
-                     if (DEBUG_THIS_FUNCTION) {
-                         console.log(`  (TENARIS) Asignado: ${clave} = ${composicion[clave]} (Valor Crudo: ${valorCrudo}, Símbolo Mapeado: ${simboloMapear}, Divisor: ${divisor})`);
+                if (processedValores.length > simbolosDetectados.length) {
+                    const descartados = processedValores.slice(simbolosDetectados.length);
+                     if (descartados.length > 0) {
+                        descartados.forEach(d => {
+                            if (d.startsWith("<")) { // Handle "< .001" type strings in discarded
+                                const parts = d.split(/\s+/);
+                                if (parts.length > 1 && !isNaN(parseFloat(parts[1].replace(',','.')))) composicion.valoresDescartados.push(parseFloat(parts[1].replace(',','.')) * 0.5);
+                                else if (!isNaN(parseFloat(d.replace(',','.')))) composicion.valoresDescartados.push(parseFloat(d.replace(',','.'))); // Fallback
+                            } else if (!isNaN(parseFloat(d.replace(',','.')))) {
+                                composicion.valoresDescartados.push(parseFloat(d.replace(',','.')));
+                            }
+                        });
                      }
-                  } else if (clave && (valorCrudo === undefined || isNaN(valorCrudo))) {
-                      if (DEBUG_THIS_FUNCTION) console.warn(`📉 (TENARIS) Símbolo ${simboloMapear} (clave: ${clave}) sin valor numérico (${valorCrudo}).`);
-                  } else if (!clave) {
-                      if (DEBUG_THIS_FUNCTION) console.warn(`🚫 (TENARIS) Símbolo ${simboloMapear} no mapeado en mapElementos.`);
-                  }
+                    if (DEBUG_THIS_FUNCTION && composicion.valoresDescartados.length > 0) console.warn(`✂️ (${formatoDetectado}) Valores numéricos descartados (exceso de la línea de valores procesada): ${composicion.valoresDescartados.join(', ')} (Original descartado: ${descartados.join(', ')})`);
+                } else if (simbolosDetectados.length > processedValores.length) {
+                    const simbolosSinValor = simbolosDetectados.slice(processedValores.length);
+                     if (DEBUG_THIS_FUNCTION && simbolosSinValor.length > 0) console.warn(`📉 (${formatoDetectado}) Símbolos sin valor asignado (faltan valores en línea procesada): ${simbolosSinValor.join(', ')}`);
                 }
             }
         }
     }
-  }
-  // --- FIN Lógica Formato TENARIS ---
+}
+// --- FIN LÓGICA FORMATO "GENERIC_CHEMICAL_ANALYSIS" ---
 
-  // --- Lógica de Aleado y Retorno (SIN CAMBIOS SIGNIFICATIVOS, REVISAR UMBRAL C PARA INOXIDABLE SI ES NECESARIO) ---
+
+
+
+
+
+
+
+
+
+
+
+
+// --- FIN LÓGICA FORMATO "GENERIC_CHEMICAL_ANALYSIS" ---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// --- INICIO LÓGICA FORMATO "SDI_LADLE" ---
+if (!formatoDetectado) {
+    const fraseSDILadle = "LADLE CHEMICAL ANALYSIS (%)";
+    let idxFraseSDILadle = -1;
+    let idxLineaSimbolosSDI = -1;
+    let idxLineaValoresSDI = -1;
+
+    for (let i = 0; i < lineas.length; i++) {
+        if (lineas[i].toUpperCase().includes(fraseSDILadle)) {
+            idxFraseSDILadle = i;
+            // Expected: Symbols on the next line, Values on the line after symbols
+            if (lineas.length > i + 2) {
+                idxLineaSimbolosSDI = i + 1;
+                idxLineaValoresSDI = i + 2;
+                formatoDetectado = "SDI_LADLE";
+                if (DEBUG_THIS_FUNCTION) {
+                    console.log(`🎯 Formato detectado: "${formatoDetectado}" por encabezado en línea ${idxFraseSDILadle} ("${lineas[idxFraseSDILadle]}").`);
+                    console.log(`  (${formatoDetectado}) Potencial Línea Símbolos (idx ${idxLineaSimbolosSDI}): "${lineas[idxLineaSimbolosSDI]}"`);
+                    console.log(`  (${formatoDetectado}) Potencial Línea Valores (idx ${idxLineaValoresSDI}): "${lineas[idxLineaValoresSDI]}"`);
+                }
+                break;
+            }
+        }
+    }
+
+    if (formatoDetectado === "SDI_LADLE") {
+        const lineaSimbolos = lineas[idxLineaSimbolosSDI];
+        const lineaValores = lineas[idxLineaValoresSDI];
+
+        const simbolosDetectados = lineaSimbolos.trim().split(/\s+/).filter(s => s.length > 0);
+        const valoresNumericos = lineaValores.trim().split(/\s+/).map(v => parseFloat(v)).filter(v => !isNaN(v));
+
+        if (DEBUG_THIS_FUNCTION) {
+            console.log(`  (${formatoDetectado}) Símbolos Detectados (${simbolosDetectados.length}): [${simbolosDetectados.join(', ')}]`);
+            console.log(`  (${formatoDetectado}) Valores Numéricos (${valoresNumericos.length}): [${valoresNumericos.join(', ')}]`);
+        }
+
+        composicion.valoresDescartados = [];
+        if (simbolosDetectados.length !== valoresNumericos.length && DEBUG_THIS_FUNCTION) {
+            console.warn(`⚠️ (${formatoDetectado}) Desajuste: Símbolos (${simbolosDetectados.length}) vs Valores (${valoresNumericos.length}).`);
+            if (valoresNumericos.length > simbolosDetectados.length) {
+                const descartados = valoresNumericos.slice(simbolosDetectados.length);
+                composicion.valoresDescartados.push(...descartados);
+                console.warn(`✂️ (${formatoDetectado}) Valores numéricos descartados (exceso): ${descartados.join(', ')}`);
+            } else {
+                const simbolosSinValor = simbolosDetectados.slice(valoresNumericos.length);
+                console.warn(`📉 (${formatoDetectado}) Símbolos sin valor asignado: ${simbolosSinValor.join(', ')}`);
+            }
+        }
+
+        const minLength = Math.min(simbolosDetectados.length, valoresNumericos.length);
+        for (let k = 0; k < minLength; k++) {
+            const simUpper = simbolosDetectados[k].toUpperCase();
+            const clave = mapElementos[simUpper]; // Uses your existing mapElementos
+            let valor = valoresNumericos[k];
+
+            if (clave && valor !== undefined && !isNaN(valor)) {
+                // Values in this MTR are direct decimal percentages (e.g., 0.05 for C)
+                // No division by 100/1000 needed.
+                if ((simUpper === 'MN') && valor > 1 && valor < 100) { 
+                    valor = valor / 100; // Heuristic for MN like "0.17" (already fine) vs. "17"
+                    if (DEBUG_THIS_FUNCTION) console.log(`      (Heurística MN) ${simbolosDetectados[k]}: ${valoresNumericos[k]} -> ${valor}`);
+                }
+                composicion[clave] = parseFloat(Number(valor).toFixed(6)); // toFixed for consistency
+                if (DEBUG_THIS_FUNCTION) console.log(`  (${formatoDetectado}) Asignado: ${clave} (${simbolosDetectados[k]}) = ${composicion[clave]}`);
+            } else if (!clave && DEBUG_THIS_FUNCTION) {
+                console.warn(`🚫 (${formatoDetectado}) Símbolo "${simbolosDetectados[k]}" no tiene mapeo en mapElementos.`);
+            }
+        }
+    }
+}
+// --- FIN LÓGICA FORMATO "SDI_LADLE" ---
+
+// Asegúrate que este nuevo bloque "SDI_LADLE" esté antes de la lógica final de 
+// determinación de acero aleado/inoxidable y el return.
+
+
+
+
+  // --- Lógica de Aleado y Retorno ---
   if (!formatoDetectado && texto.length > 0) {
     if (DEBUG_THIS_FUNCTION) console.warn("⚠️ No se encontró ninguna sección de composición química conocida en el texto.");
   } else if (formatoDetectado) {
@@ -470,7 +1253,6 @@ if (DEBUG_THIS_FUNCTION && lineaValoresPotencial.trim().startsWith('P ')) { // O
   for (const [elementoClaveComposicion, limite] of Object.entries(umbralesAleado)) {
     if (composicion[elementoClaveComposicion] === null || composicion[elementoClaveComposicion] === undefined || isNaN(composicion[elementoClaveComposicion])) continue;
     const val = composicion[elementoClaveComposicion];
-    // Find the original symbol (like 'C', 'MN', 'CE LF') for logging purposes
     let simboloParaLog = Object.keys(mapElementos).find(key => mapElementos[key] === elementoClaveComposicion) || elementoClaveComposicion.toUpperCase();
 
     if (val >= limite) {
@@ -478,40 +1260,32 @@ if (DEBUG_THIS_FUNCTION && lineaValoresPotencial.trim().startsWith('P ')) { // O
       if (!composicion.elementosAleantes.includes(simboloParaLog)) {
         composicion.elementosAleantes.push(simboloParaLog);
       }
-      justificaciones.push(`${simboloParaLog} ${Number(val).toFixed(4)}% >= ${limite}%`);
+      // Asegurarse de que 'val' y 'limite' se muestren como porcentajes si así están definidos los umbrales
+      justificaciones.push(`${simboloParaLog} ${Number(val * 100).toFixed(4)}% >= ${Number(limite * 100).toFixed(4)}%`);
     }
   }
 
-  const { carbono: c_val, cromo: cr_val, molibdeno: mo_val, vanadio: v_val, niobio: nb_val, nitrogeno: n_val, aluminio: al_val, niquel: ni_val } = composicion;
+  const { carbono: c_val, cromo: cr_val, molibdeno: mo_val, vanadio: v_val, niobio: nb_val, nitrogeno: n_val, aluminio: al_val } = composicion;
   let tipoAceroDeterminado = 'sin alear';
   let justificacionTipo = 'Por defecto. No cumple criterios de aleado o inoxidable.';
 
-  // Definición de acero inoxidable (ej. según Nota 1e del Cap 72 TIGIE: Cr >= 10.5% y C <= 1.2%)
-  // El umbral original de c_val <= 0.012% era muy restrictivo y probablemente incorrecto para la mayoría de los inoxidables.
-  // Se ajusta a c_val <= 1.2% que es más común. Verificar la normativa aplicable.
-  if (cr_val !== null && cr_val >= 0.105 && (c_val === null || c_val <= 0.012)) { // Ajustado c_val <= 1.2% (0.012 * 100 = 1.2%)
-                                                                                 // El valor original 0.012 (si es %) es 0.00012 (si es fracción)
-                                                                                 // Asumiendo los valores en 'composicion' son fracciones (e.g., 0.5 para 0.5%)
-                                                                                 // El código original tenía: c_val <= 0.012 && cr_val >= 0.105
-                                                                                 // Si c_val es 0.10 (10% C), 0.012 es muy bajo. Si c_val es 0.0010 (0.10% C), 0.012 es 1.2% C
-                                                                                 // Vamos a mantener la lógica original de umbral, pero esto debe ser verificado.
-                                                                                 // La condición original del usuario era c_val <= 0.012 (interpretado como fracción directa)
+  // Nota: Los valores en 'composicion' se asumen como fracciones decimales (e.g., 0.05 para 5%).
+  // Los umbrales como 0.105 (para 10.5% Cr) y 0.012 (para 1.2% C) deben ser consistentes.
+  if (cr_val !== null && cr_val >= 0.105 && (c_val === null || c_val <= 0.012)) {
     tipoAceroDeterminado = 'inoxidable';
-    esAleadoDefinidoPorElemento = true; // Inoxidable es un tipo de aleado
-    justificacionTipo = `Acero inoxidable (C ${Number(c_val || 0).toFixed(4)} <= 0.012, Cr ${Number(cr_val || 0).toFixed(4)} >= 0.105).`;
-    if (!justificaciones.some(j => j.startsWith("Cr"))) justificaciones.push(`Cr ${Number(cr_val || 0).toFixed(4)} >= 0.105`);
-     if (c_val !== null && !justificaciones.some(j => j.startsWith("C "))) justificaciones.push(`C ${Number(c_val).toFixed(4)} <= 0.012`);
-
-
-  } else if ( // Aceros tipo P91/T91 (ejemplo, ajustar rangos según sea necesario)
+    esAleadoDefinidoPorElemento = true;
+    justificacionTipo = `Acero inoxidable (C ${c_val !== null ? Number(c_val * 100).toFixed(4) : 'N/A'}% <= 1.2%, Cr ${Number(cr_val * 100).toFixed(4)}% >= 10.5%).`;
+    if (!justificaciones.some(j => j.startsWith("Cr"))) justificaciones.push(`Cr ${Number(cr_val * 100).toFixed(4)}% >= 10.5%`);
+    if (c_val !== null && !justificaciones.some(j => j.startsWith("C "))) justificaciones.push(`C ${Number(c_val * 100).toFixed(4)}% <= 1.2%`);
+  } else if (
       c_val !== null && cr_val !== null && mo_val !== null && v_val !== null && nb_val !== null &&
-      (c_val >= 0.0008 && c_val <= 0.0012) && // 0.08% to 0.12%
-      (cr_val >= 0.080 && cr_val <= 0.095) &&  // 8.0% to 9.5%
-      (mo_val >= 0.0085 && mo_val <= 0.0105) && // 0.85% to 1.05%
-      (v_val >= 0.0018 && v_val <= 0.0025) &&  // 0.18% to 0.25%
-      (nb_val >= 0.0006 && nb_val <= 0.0010) && // 0.06% to 0.10%
-      (n_val === null || (n_val >= 0.0003 && n_val <= 0.0007)) && // 0.03% to 0.07%
-      (al_val === null || al_val <= 0.0004) // <= 0.04%
+      (c_val >= 0.0008 && c_val <= 0.0012) && // C: 0.08% - 0.12%
+      (cr_val >= 0.080 && cr_val <= 0.095) &&  // Cr: 8.0% - 9.5%
+      (mo_val >= 0.0085 && mo_val <= 0.0105) && // Mo: 0.85% - 1.05%
+      (v_val >= 0.0018 && v_val <= 0.0025) &&  // V: 0.18% - 0.25%
+      (nb_val >= 0.0006 && nb_val <= 0.0010) && // Nb: 0.06% - 0.10%
+      (n_val === null || (n_val >= 0.0003 && n_val <= 0.0007)) && // N: 0.03% - 0.07%
+      (al_val === null || al_val <= 0.0004) // Al: <= 0.04%
   ) {
     tipoAceroDeterminado = 'P91/T91 (X10CrMoVNb9-1)';
     esAleadoDefinidoPorElemento = true;
@@ -530,4 +1304,3 @@ if (DEBUG_THIS_FUNCTION && lineaValoresPotencial.trim().startsWith('P ')) { // O
 }
 
 module.exports = { detectarComposicionQuimica };
-// --- FIN DEL ARCHIVO ---
