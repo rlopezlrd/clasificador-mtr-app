@@ -156,11 +156,20 @@ export function determinarSubpartida(props, partida) {
     // --- PRODUCTOS LAMINADOS PLANOS ---
     // Partidas 7208 a 7212 (sin alear), 7219-7220 (inox), 7225-7226 (otros aleados)
 
+// Archivo: asignarSubpartidaCap72.js
+
+// ... (resto de la función y otras partidas) ...
+
     case '7208': // Laminados planos s/alear, >=600mm, caliente, sin chapar/revestir
       justificacion = 'Laminado plano s/alear, ≥600mm, caliente, s/revestir, ';
-      if (formaFisica.includes('rollo') || tipoProducto.includes('coil')) {
+      // ANTERIOR: if (formaFisica.includes('rollo') || tipoProducto.includes('coil')) {
+      if (props.esEnrollado) { // <--- CAMBIO AQUÍ: Usar props.esEnrollado
         justificacion += 'enrollado, ';
-        if (desc.includes('relieve') || obs.includes('relieve')) return { subpartida: '720810', justificacion: justificacion + 'con motivos en relieve.' };
+        if (desc.includes('relieve') || obs.includes('relieve')) {
+          return { subpartida: '720810', justificacion: justificacion + 'con motivos en relieve.' };
+        }
+        // El producto está enrollado y sin motivos en relieve.
+        // Ahora se verifica si está decapado. props.acabado puede ser 'decapado'.
         if (acabado.includes('decapado')) {
           justificacion += 'decapado, ';
           if (espesor >= 4.75) return { subpartida: '720825', justificacion: justificacion + 'espesor ≥ 4.75 mm.' };
@@ -168,27 +177,46 @@ export function determinarSubpartida(props, partida) {
           return { subpartida: '720827', justificacion: justificacion + 'espesor < 3 mm.' };
         }
         // Los demás enrollados (sin relieve, sin decapar)
-        justificacion += 'los demás (sin relieve, sin decapar), ';
+        justificacion += 'los demás (sin motivos en relieve, sin decapar), ';
         if (espesor > 10) return { subpartida: '720836', justificacion: justificacion + 'espesor > 10 mm.' };
         if (espesor >= 4.75) return { subpartida: '720837', justificacion: justificacion + 'espesor ≥ 4.75 mm y ≤ 10 mm.' };
         if (espesor >= 3) return { subpartida: '720838', justificacion: justificacion + 'espesor ≥ 3 mm y < 4.75 mm.' };
         return { subpartida: '720839', justificacion: justificacion + 'espesor < 3 mm.' };
       } else { // Sin enrollar
         justificacion += 'sin enrollar, ';
-        if (desc.includes('relieve') || obs.includes('relieve')) return { subpartida: '720840', justificacion: justificacion + 'con motivos en relieve.' };
-        // Los demás sin enrollar (sin relieve)
-        justificacion += 'los demás (sin relieve), ';
+        if (desc.includes('relieve') || obs.includes('relieve')) {
+          return { subpartida: '720840', justificacion: justificacion + 'con motivos en relieve.' };
+        }
+        // Los demás sin enrollar (sin motivos en relieve).
+        // Para productos no enrollados, la tarifa generalmente no subdivide por "decapado"
+        // a este nivel de subpartida (7208.51 a 7208.54), ya que "simplemente laminado en caliente"
+        // puede incluir el decapado.
+        justificacion += 'los demás (sin motivos en relieve), ';
         if (espesor > 10) return { subpartida: '720851', justificacion: justificacion + 'espesor > 10 mm.' };
         if (espesor >= 4.75) return { subpartida: '720852', justificacion: justificacion + 'espesor ≥ 4.75 mm y ≤ 10 mm.' };
         if (espesor >= 3) return { subpartida: '720853', justificacion: justificacion + 'espesor ≥ 3 mm y < 4.75 mm.' };
         return { subpartida: '720854', justificacion: justificacion + 'espesor < 3 mm.' };
       }
-      // La subpartida 7208.90 es para "Los demás" (trabajados posteriormente, pero sin chapar ni revestir)
-      // return { subpartida: '720890', justificacion: justificacion + 'trabajados posteriormente (sin chapar/revestir).' };
+      // Nota: La subpartida 7208.90 es para "Los demás" (trabajados posteriormente de maneras no cubiertas arriba,
+      // pero aún sin chapar ni revestir metálicamente). El decapado por sí solo usualmente no
+      // mueve el producto a 7208.90 si por lo demás es "simplemente laminado en caliente".
+      // Si tuvieras lógica para 7208.90, iría después de estas condiciones si ninguna se cumple.
+      // Por ahora, el código no tiene un camino explícito hacia 7208.90.
+
+// ... (continuar con el resto de las partidas en el switch) ...
+
+
+
+
+
 
     case '7209': // Laminados planos s/alear, >=600mm, frío, sin chapar/revestir
       justificacion = 'Laminado plano s/alear, ≥600mm, frío, s/revestir, ';
-      if (formaFisica.includes('rollo') || tipoProducto.includes('coil')) {
+     // if (formaFisica.includes('rollo') || tipoProducto.includes('coil')) {
+if (props.esEnrollado){   //  agregado
+     
+
+
         justificacion += 'enrollado, ';
         if (espesor >= 3) return { subpartida: '720915', justificacion: justificacion + 'espesor ≥ 3 mm.' };
         if (espesor > 1) return { subpartida: '720916', justificacion: justificacion + 'espesor > 1 mm y < 3 mm.' };
@@ -233,28 +261,59 @@ export function determinarSubpartida(props, partida) {
       // 7210.90 es para "Los demás" (incluye chapados)
       return { subpartida: '721090', justificacion: justificacion + 'los demás (e.g. chapados).' };
 
+
+// Archivo: asignarSubpartidaCap72.js
+
+// ... (resto de la función y otras partidas) ...
+
     case '7211': // Laminados planos s/alear, <600mm, sin chapar/revestir
       justificacion = 'Laminado plano s/alear, <600mm, s/revestir, ';
-      // "Simplemente laminados en caliente"
-      if (acabado.includes('caliente')) {
-        justificacion += 'laminado en caliente, ';
-        // 7211.13 "Laminados en las cuatro caras o en acanaladuras cerradas (fleje universal)..."
-        if ((desc.includes('cuatro caras') || desc.includes('acanaladura cerrada') || tipoProducto.includes('fleje universal')) && ancho > 150 && espesor >=4 && !formaFisica.includes('rollo')) {
-            return { subpartida: '721113', justificacion: justificacion + 'laminado en 4 caras/acanaladura cerrada (fleje universal), ancho > 150mm, esp. >= 4mm, no enrollado.' };
+
+      // ANTERIOR: if (acabado.includes('caliente')) {
+      if (props.procesoLaminado === 'caliente') { // <--- CAMBIO AQUÍ
+        justificacion += 'simplemente laminado en caliente, '; // "Simplemente" se asume si no hay más información
+
+        // 7211.13 "Laminados en las cuatro caras o en acanaladuras cerradas (fleje universal)... sin enrollar"
+        // ANTERIOR: !formaFisica.includes('rollo')
+        if ((desc.includes('cuatro caras') || desc.includes('acanaladura cerrada') || tipoProducto.includes('fleje universal')) &&
+            (ancho > 150 && ancho < 600) && // Asegurar que el ancho esté dentro del rango para fleje universal
+            espesor >= 4 &&
+            !props.esEnrollado && // <--- CAMBIO AQUÍ
+            !desc.includes('relieve') // La subpartida también especifica "sin motivos en relieve"
+           ) {
+            return { subpartida: '721113', justificacion: justificacion + 'laminado en 4 caras/acanaladura cerrada (fleje universal), ancho > 150mm y < 600mm, esp. ≥ 4mm, sin enrollar y sin motivos en relieve.' };
         }
-        // 7211.14 "Los demás, de espesor >= 4.75 mm"
-        if (espesor >= 4.75) return { subpartida: '721114', justificacion: justificacion + 'los demás, espesor ≥ 4.75 mm.' };
-        // 7211.19 "Los demás" (espesor < 4.75mm)
+
+        // 7211.14 "Los demás (laminados en caliente), de espesor >= 4.75 mm"
+        // (No incluye los de 7211.13)
+        if (espesor >= 4.75) {
+          return { subpartida: '721114', justificacion: justificacion + 'los demás, espesor ≥ 4.75 mm.' };
+        }
+        
+        // 7211.19 "Los demás (laminados en caliente)" (espesor < 4.75mm y no 7211.13)
         return { subpartida: '721119', justificacion: justificacion + 'los demás, espesor < 4.75 mm.' };
       }
-      // "Simplemente laminados en frío"
-      if (acabado.includes('frio')) {
-        justificacion += 'laminado en frío, ';
-        if (carbono < 0.0025) return { subpartida: '721123', justificacion: justificacion + 'C < 0.25%.' };
-        return { subpartida: '721129', justificacion: justificacion + 'C ≥ 0.25%.' };
+
+      // ANTERIOR: if (acabado.includes('frio')) {
+      if (props.procesoLaminado === 'frio') { // <--- CAMBIO AQUÍ
+        justificacion += 'simplemente laminado en frío, '; // "Simplemente" se asume
+
+        // 7211.23 "Con un contenido de carbono inferior al 0.25 % en peso"
+        if (carbono < 0.0025) { // Asumiendo que `carbono` es un valor como 0.0020 para 0.20%
+          return { subpartida: '721123', justificacion: justificacion + 'C < 0.25%.' };
+        }
+        // 7211.29 "Los demás" (C >= 0.25%)
+        return { subpartida: '721129', justificacion: justificacion + 'los demás (C ≥ 0.25%).' };
       }
-      // "Los demás" (trabajados posteriormente)
-      return { subpartida: '721190', justificacion: justificacion + 'los demás (trabajados posteriormente).' };
+      
+      // 7211.90 "Los demás"
+      // Esto cubriría productos de la partida 7211 que no son simplemente laminados en caliente o en frío
+      // (por ejemplo, si estuvieran trabajados posteriormente de alguna manera que no los mueva a otra partida,
+      // aunque 7211 es específicamente "sin chapar ni revestir").
+      // O si props.procesoLaminado no es ni 'caliente' ni 'frio'.
+      return { subpartida: '721190', justificacion: justificacion + 'los demás (e.g., trabajados posteriormente o proceso no especificado como caliente/frío).' };
+
+            
 
     case '7212': // Laminados planos s/alear, <600mm, chapados o revestidos
       justificacion = 'Laminado plano s/alear, <600mm, revestido: ';
@@ -401,17 +460,25 @@ export function determinarSubpartida(props, partida) {
       }
       return { subpartida: '721899', justificacion: justificacion + 'los demás (e.g. sección circular, cuadrada).' };
 
+// Archivo: asignarSubpartidaCap72.js
+
+// ... (resto de la función y otras partidas) ...
+
     case '7219': // Laminados planos inox, >=600mm
       justificacion = 'Laminado plano inox, ≥600mm, ';
-      if (acabado.includes('caliente')) {
-        justificacion += 'laminado en caliente, ';
-        if (formaFisica.includes('rollo') || tipoProducto.includes('coil')) {
+
+      // ANTERIOR: if (acabado.includes('caliente')) {
+      if (props.procesoLaminado === 'caliente') { // <--- CAMBIO AQUÍ
+        justificacion += 'simplemente laminado en caliente, '; // "Simplemente" se asume
+
+        // ANTERIOR: if (formaFisica.includes('rollo') || tipoProducto.includes('coil')) {
+        if (props.esEnrollado) { // <--- CAMBIO AQUÍ (Productos enrollados - corresponden a 7219.1x)
           justificacion += 'enrollado, ';
           if (espesor > 10) return { subpartida: '721911', justificacion: justificacion + 'espesor > 10 mm.' };
           if (espesor >= 4.75) return { subpartida: '721912', justificacion: justificacion + 'espesor ≥ 4.75 mm y ≤ 10 mm.' };
           if (espesor >= 3) return { subpartida: '721913', justificacion: justificacion + 'espesor ≥ 3 mm y < 4.75 mm.' };
           return { subpartida: '721914', justificacion: justificacion + 'espesor < 3 mm.' };
-        } else { // Sin enrollar
+        } else { // Sin enrollar (Productos no enrollados - corresponden a 7219.2x)
           justificacion += 'sin enrollar, ';
           if (espesor > 10) return { subpartida: '721921', justificacion: justificacion + 'espesor > 10 mm.' };
           if (espesor >= 4.75) return { subpartida: '721922', justificacion: justificacion + 'espesor ≥ 4.75 mm y ≤ 10 mm.' };
@@ -419,49 +486,128 @@ export function determinarSubpartida(props, partida) {
           return { subpartida: '721924', justificacion: justificacion + 'espesor < 3 mm.' };
         }
       }
-      if (acabado.includes('frio')) { // No distingue enrollado/sin enrollar para las subpartidas base de frío
-        justificacion += 'laminado en frío, ';
+
+      // ANTERIOR: if (acabado.includes('frio')) {
+      if (props.procesoLaminado === 'frio') { // <--- CAMBIO AQUÍ (Productos laminados en frío - corresponden a 7219.3x)
+        justificacion += 'simplemente laminado en frío, '; // "Simplemente" se asume
+        // Para el acero inoxidable laminado en frío (7219.3), la distinción enrollado/no enrollado
+        // no define las subpartidas principales a 6 dígitos; se basan en el espesor.
         if (espesor >= 4.75) return { subpartida: '721931', justificacion: justificacion + 'espesor ≥ 4.75 mm.' };
         if (espesor >= 3) return { subpartida: '721932', justificacion: justificacion + 'espesor ≥ 3 mm y < 4.75 mm.' };
         if (espesor > 1) return { subpartida: '721933', justificacion: justificacion + 'espesor > 1 mm y < 3 mm.' };
         if (espesor >= 0.5) return { subpartida: '721934', justificacion: justificacion + 'espesor ≥ 0.5 mm y ≤ 1 mm.' };
         return { subpartida: '721935', justificacion: justificacion + 'espesor < 0.5 mm.' };
       }
-      // "Los demás" (trabajados posteriormente)
-      return { subpartida: '721990', justificacion: justificacion + 'los demás (trabajados posteriormente).' };
+      
+      // 7219.90 "Los demás"
+      // Cubre productos de acero inoxidable laminados planos de la partida 7219 que no son
+      // simplemente laminados en caliente o en frío (e.g., trabajados posteriormente como perforados,
+      // conformados de manera especial, etc., pero sin llegar a ser manufacturas de otra partida).
+      // O si props.procesoLaminado no es ni 'caliente' ni 'frio'.
+      return { subpartida: '721990', justificacion: justificacion + 'los demás (e.g., trabajados posteriormente o proceso no especificado como caliente/frío).' };
+
+
+
+// Archivo: asignarSubpartidaCap72.js
+
+// ... (resto de la función y otras partidas) ...
 
     case '7220': // Laminados planos inox, <600mm
       justificacion = 'Laminado plano inox, <600mm, ';
-      if (acabado.includes('caliente')) { // No distingue enrollado/sin enrollar para subpartidas base
-        justificacion += 'laminado en caliente, ';
-        if (espesor >= 4.75) return { subpartida: '722011', justificacion: justificacion + 'espesor ≥ 4.75 mm.' };
+
+      // ANTERIOR: if (acabado.includes('caliente')) {
+      if (props.procesoLaminado === 'caliente') { // <--- CAMBIO AQUÍ
+        justificacion += 'simplemente laminado en caliente, '; // "Simplemente" se asume
+
+        // Para 7220.1 (laminados en caliente), la distinción es por espesor.
+        // No se suele distinguir por "enrollado" vs "sin enrollar" a este nivel de subpartida para <600mm.
+        if (espesor >= 4.75) {
+          return { subpartida: '722011', justificacion: justificacion + 'espesor ≥ 4.75 mm.' };
+        }
         return { subpartida: '722012', justificacion: justificacion + 'espesor < 4.75 mm.' };
       }
-      if (acabado.includes('frio')) {
-        return { subpartida: '722020', justificacion: justificacion + 'simplemente laminado en frío.' };
+
+      // ANTERIOR: if (acabado.includes('frio')) {
+      if (props.procesoLaminado === 'frio') { // <--- CAMBIO AQUÍ
+        justificacion += 'simplemente laminado en frío.'; // "Simplemente" se asume
+        return { subpartida: '722020', justificacion }; // 7220.20 es una subpartida única para laminados en frío.
       }
-      // "Los demás" (trabajados posteriormente)
-      return { subpartida: '722090', justificacion: justificacion + 'los demás (trabajados posteriormente).' };
+      
+      // 7220.90 "Los demás"
+      // Cubre productos de la partida 7220 que no son simplemente laminados en caliente o en frío
+      // (e.g., trabajados posteriormente, pero aún <600mm y de acero inoxidable).
+      // O si props.procesoLaminado no es ni 'caliente' ni 'frio'.
+      return { subpartida: '722090', justificacion: justificacion + 'los demás (e.g., trabajados posteriormente o proceso no especificado como caliente/frío).' };
+
+// ... (continuar con el resto de las partidas en el switch) ...
+
+
 
     case '7221': // Alambrón de acero inoxidable
       return { subpartida: '722100', justificacion: 'Alambrón de acero inoxidable.' };
 
+// Archivo: asignarSubpartidaCap72.js
+
+// ... (resto de la función y otras partidas) ...
+
     case '7222': // Barras y perfiles, de acero inoxidable
       justificacion = 'De acero inoxidable: ';
-      // "Barras simplemente laminadas o extrudidas en caliente"
-      if (acabado.includes('caliente') || acabado.includes('extrudido')) {
-        justificacion += 'barra simplemente laminada/extrudida en caliente, ';
-        if (formaTransversal.includes('circular')) return { subpartida: '722211', justificacion: justificacion + 'de sección circular.' };
-        return { subpartida: '722219', justificacion: justificacion + 'las demás secciones.' };
+
+      // Primero, identificar los perfiles, ya que tienen su propia subpartida (7222.40)
+      if (tipoProducto.includes('perfil') || tipoProducto.includes('angulo') || tipoProducto.includes('forma') || tipoProducto.includes('seccion')) {
+        // La partida 7222.40 es para "Perfiles". No se subdivide más por acabado en caliente/frío a este nivel.
+        return { subpartida: '722240', justificacion: justificacion + 'perfil.' };
       }
-      // "Barras simplemente obtenidas o acabadas en frío"
-      if (acabado.includes('frio') || desc.includes('obtenida en frio') || desc.includes('acabada en frio')) {
-        return { subpartida: '722220', justificacion: justificacion + 'barra simplemente obtenida/acabada en frío.' };
+
+      // Si no es un perfil, entonces es una barra.
+      // La lógica para barras sigue:
+      if (props.tipoProducto && (props.tipoProducto.includes('barra') || props.tipoProducto.includes('varilla') || props.tipoProducto.includes('rod'))) {
+        // "Barras simplemente laminadas o extrudidas en caliente" (o acabadas en caliente) - Corresponde a 7222.1x
+        // ANTERIOR: if (acabado.includes('caliente') || acabado.includes('extrudido')) {
+        if (props.procesoLaminado === 'caliente') { // <--- CAMBIO AQUÍ
+          justificacion += 'barra, simplemente obtenida/acabada en caliente (laminada, estirada o extrudida), ';
+          if (formaTransversal.includes('circular') || formaTransversal.includes('redonda')) {
+            return { subpartida: '722211', justificacion: justificacion + 'de sección circular.' }; // 7222.11
+          }
+          return { subpartida: '722219', justificacion: justificacion + 'de las demás secciones.' }; // 7222.19
+        }
+
+        // "Barras simplemente obtenidas o acabadas en frío" - Corresponde a 7222.20
+        // ANTERIOR: if (acabado.includes('frio') || desc.includes('obtenida en frio') || desc.includes('acabada en frio')) {
+        if (props.procesoLaminado === 'frio') { // <--- CAMBIO AQUÍ
+          justificacion += 'barra, simplemente obtenida/acabada en frío, ';
+          return { subpartida: '722220', justificacion }; // 7222.20 es una subpartida única para barras acabadas en frío.
+        }
+
+        // "Las demás barras" (e.g., forjadas, o trabajadas más allá del simple acabado en caliente/frío) - Corresponde a 7222.30
+        // Esto incluye barras forjadas. Si props.acabado puede ser "forjado", se podría usar.
+        // De lo contrario, se puede inferir si no es ni caliente ni frío y es una barra.
+        // O si `desc` o `textoGeneral` indican "forjado".
+        if (desc.includes('forjada') || textoGeneral.includes('forged bar')) {
+            justificacion += 'barra, forjada, ';
+        } else {
+            justificacion += 'barra, las demás (ni simplemente acabada en caliente ni en frío), ';
+        }
+        return { subpartida: '722230', justificacion };
       }
-      // "Perfiles"
-      if (tipoProducto.includes('perfil')) return { subpartida: '722240', justificacion: justificacion + 'perfil.' };
-      // "Las demás barras" (e.g. forjadas y trabajadas posteriormente)
-      return { subpartida: '722230', justificacion: justificacion + 'las demás barras (e.g. forjadas).' };
+      
+      // Fallback si es de la partida 7222 pero no se identifica claramente como perfil o barra con proceso.
+      // Esto podría ser un perfil si `tipoProducto` no fue lo suficientemente específico.
+      // O podría ser una barra donde el proceso no se pudo determinar.
+      // Es mejor tener un fallback específico para perfiles si aún es posible, o a "demás barras".
+      if (DEBUG) console.warn(`[asignarSubpartidaCap72] Producto en 7222 no claramente identificable como perfil o barra con proceso definido. Props: ${JSON.stringify(props)}`);
+      // Si `tipoProducto` era ambiguo, pero por el contexto de la partida es probable que sea una barra o perfil.
+      // Si es un perfil pero la palabra "perfil" no estaba en tipoProducto:
+      if (formaTransversal.match(/^(u|i|h|l|t|angulo|viga|canal)$/i) && !tipoProducto.includes('barra')) {
+         return { subpartida: '722240', justificacion: justificacion + 'perfil (inferido).' };
+      }
+      // Por defecto, si no es perfil y no se pudo determinar el proceso para barra, va a "demás barras".
+      return { subpartida: '722230', justificacion: justificacion + 'las demás barras (proceso no determinado claramente).' };
+
+// ... (continuar con el resto
+
+
+
 
     case '7223': // Alambre de acero inoxidable
       return { subpartida: '722300', justificacion: 'Alambre de acero inoxidable.' };
@@ -475,6 +621,11 @@ export function determinarSubpartida(props, partida) {
       // Semiproductos
       return { subpartida: '722490', justificacion: justificacion + 'semiproducto.' }; // Subpartida única para semiproductos de otros aleados
 
+
+// Dentro de asignarSubpartidaCap72.js
+
+// ... (otras partes de la función)
+
     case '7225': // Laminados planos de los demás aceros aleados, >=600mm
       justificacion = 'Laminado plano de otros aceros aleados, ≥600mm: ';
       if (desc.includes('acero al silicio') || obs.includes('acero magnetico')) {
@@ -482,13 +633,23 @@ export function determinarSubpartida(props, partida) {
         return { subpartida: '722519', justificacion: justificacion + 'de acero al silicio (no grano orientado).' };
       }
       // "Los demás" (no acero al silicio)
-      if (acabado.includes('caliente')) {
+      // ANTERIOR: if (acabado.includes('caliente')) {
+      if (props.procesoLaminado === 'caliente') { // <--- CAMBIO AQUÍ: Usar props.procesoLaminado
         justificacion += 'simplemente laminado en caliente, ';
-        if (formaFisica.includes('rollo') || tipoProducto.includes('coil')) return { subpartida: '722530', justificacion: justificacion + 'enrollado.' };
+        // Asegurarse de usar props.esEnrollado como se discutió para robustez
+        if (props.esEnrollado) { // <--- CAMBIO AQUÍ (si no se hizo antes, usar props.esEnrollado)
+            return { subpartida: '722530', justificacion: justificacion + 'enrollado.' };
+        }
         return { subpartida: '722540', justificacion: justificacion + 'sin enrollar.' };
       }
-      if (acabado.includes('frio')) return { subpartida: '722550', justificacion: justificacion + 'simplemente laminado en frío.' };
+      // ANTERIOR: if (acabado.includes('frio')) return { subpartida: '722550', justificacion: justificacion + 'simplemente laminado en frío.' };
+      if (props.procesoLaminado === 'frio') { // <--- CAMBIO AQUÍ: Usar props.procesoLaminado
+          return { subpartida: '722550', justificacion: justificacion + 'simplemente laminado en frío.' };
+      }
       // "Los demás" (revestidos o trabajados posteriormente)
+      // Esta parte del bloque para 7225.9x no necesita cambiar, ya que maneja revestimientos.
+      // Un producto decapado (pickled) no se considera "revestido" o "trabajado posteriormente"
+      // en el sentido que lo clasificaría aquí si es simplemente laminado en caliente o frío.
       if (rec.includes('galvanizado_electrolitico') || rec.includes('electrocincado')) {
         return { subpartida: '722591', justificacion: justificacion + 'cincado electrolíticamente.' };
       }
@@ -497,17 +658,60 @@ export function determinarSubpartida(props, partida) {
       }
       return { subpartida: '722599', justificacion: justificacion + 'los demás (e.g. otros revestimientos, trabajados).' };
 
+// ... (resto del switch)
+
+// Archivo: asignarSubpartidaCap72.js
+
+// ... (resto de la función y otras partidas) ...
+
     case '7226': // Laminados planos de los demás aceros aleados, <600mm
       justificacion = 'Laminado plano de otros aceros aleados, <600mm: ';
-      if (desc.includes('acero al silicio') || obs.includes('acero magnetico')) {
-        if (desc.includes('grano orientado')) return { subpartida: '722611', justificacion: justificacion + 'de acero al silicio de grano orientado.' };
-        return { subpartida: '722619', justificacion: justificacion + 'de acero al silicio (no grano orientado).' };
+
+      // Primero, verificar tipos de acero específicos que tienen sus propias subpartidas.
+      // Acero al silicio (eléctrico) - 7226.1x
+      if (desc.includes('acero al silicio') || obs.includes('acero magnetico') || textoGeneral.includes('silicon-electrical steel')) {
+        if (desc.includes('grano orientado') || textoGeneral.includes('grain-oriented')) {
+          return { subpartida: '722611', justificacion: justificacion + 'de acero al silicio de grano orientado.' };
+        }
+        return { subpartida: '722619', justificacion: justificacion + 'de acero al silicio (eléctrico), los demás (no grano orientado).' };
       }
-      if (desc.includes('acero rapido') || obs.includes('acero rapido')) return { subpartida: '722620', justificacion: justificacion + 'de acero rápido.' };
-      // "Los demás"
-      if (acabado.includes('caliente')) return { subpartida: '722691', justificacion: justificacion + 'simplemente laminado en caliente.' };
-      if (acabado.includes('frio')) return { subpartida: '722692', justificacion: justificacion + 'simplemente laminado en frío.' };
-      return { subpartida: '722699', justificacion: justificacion + 'los demás (revestidos, trabajados).' };
+
+      // Acero rápido - 7226.20
+      if (desc.includes('acero rapido') || obs.includes('acero rapido') || textoGeneral.includes('high-speed steel')) {
+        return { subpartida: '722620', justificacion: justificacion + 'de acero rápido.' };
+      }
+
+      // "Los demás" aceros aleados (no de silicio eléctrico, no rápidos)
+      // Aquí se diferencia por el proceso de laminado.
+      // ANTERIOR: if (acabado.includes('caliente'))
+      if (props.procesoLaminado === 'caliente') { // <--- CAMBIO AQUÍ
+        // 7226.91: Simplemente laminados en caliente
+        return { subpartida: '722691', justificacion: justificacion + 'los demás, simplemente laminados en caliente.' };
+      }
+
+      // ANTERIOR: if (acabado.includes('frio'))
+      if (props.procesoLaminado === 'frio') { // <--- CAMBIO AQUÍ
+        // 7226.92: Simplemente laminados en frío
+        return { subpartida: '722692', justificacion: justificacion + 'los demás, simplemente laminados en frío.' };
+      }
+      
+      // 7226.99: "Los demás"
+      // Esto cubre productos de la partida 7226 que no son de acero al silicio, ni de acero rápido,
+      // y no son simplemente laminados en caliente o en frío (e.g., revestidos, o trabajados posteriormente
+      // de maneras que los excluyen de .91 o .92).
+      // O si props.procesoLaminado no es ni 'caliente' ni 'frio'.
+      if (rec && rec !== '-' && rec !== 'sin recubrimiento') {
+        justificacion += `los demás, ${rec}, `;
+      } else {
+        justificacion += 'los demás (e.g. trabajados posteriormente o proceso no especificado como caliente/frío), ';
+      }
+      return { subpartida: '722699', justificacion };
+
+// ... (continuar con el resto de las partidas en el switch) ...
+
+
+
+
 
     case '7227': // Alambrón de los demás aceros aleados
       justificacion = 'Alambrón de otros aceros aleados: ';
@@ -515,33 +719,77 @@ export function determinarSubpartida(props, partida) {
       if (desc.includes('acero silicomanganeso') || obs.includes('silicomanganeso')) return { subpartida: '722720', justificacion: justificacion + 'de acero silicomanganeso.' };
       return { subpartida: '722790', justificacion: justificacion + 'los demás.' };
 
+    
+    
+  // Archivo: asignarSubpartidaCap72.js
+
+// ... (resto de la función y otras partidas) ...
+
     case '7228': // Barras y perfiles, de los demás aceros aleados; barras huecas para perforación
       justificacion = 'De otros aceros aleados: ';
-      if (tipoProducto.includes('barra') && (desc.includes('acero rapido') || obs.includes('acero rapido'))) {
-        return { subpartida: '722810', justificacion: justificacion + 'barras de acero rápido.' };
+
+      // 1. Barras huecas para perforación (7228.80)
+      if ( (tipoProducto.includes('barra hueca') || textoGeneral.includes('hollow drill bar')) && 
+           (desc.includes('perforacion') || textoGeneral.includes('drill')) ) {
+        // Nota: La tarifa indica "aceros aleados o sin alear" para 7228.80, pero la partida 7228 es de "otros aceros aleados".
+        // Esto es una particularidad de la nomenclatura para esta subpartida específica.
+        return { subpartida: '722880', justificacion: justificacion + 'barras huecas para perforación.' };
       }
-      if (tipoProducto.includes('barra') && (desc.includes('acero silicomanganeso') || obs.includes('silicomanganeso'))) {
-        return { subpartida: '722820', justificacion: justificacion + 'barras de acero silicomanganeso.' };
+
+      // 2. Perfiles (ángulos, formas, secciones) (7228.70)
+      if (tipoProducto.includes('perfil') || tipoProducto.includes('angulo') || tipoProducto.includes('forma') || tipoProducto.includes('seccion') ||
+          formaTransversal.match(/^(u|i|h|l|t|viga|canal)$/i) // Inferencia por forma transversal si tipoProducto es genérico
+         ) {
+        // La subpartida 7228.70 es para "Perfiles". No se subdivide más por acabado a este nivel.
+        return { subpartida: '722870', justificacion: justificacion + 'perfiles.' };
       }
-      // "Las demás barras"
-      if (tipoProducto.includes('barra')) {
-        justificacion += 'las demás barras, ';
-        if (acabado.includes('caliente') || acabado.includes('extrudido')) { // "simplemente laminadas o extrudidas en caliente"
-          return { subpartida: '722830', justificacion: justificacion + 'simplemente laminadas/extrudidas en caliente.' };
+
+      // 3. Barras (si no es barra hueca de perforación ni perfil)
+      if (tipoProducto.includes('barra') || tipoProducto.includes('varilla') || tipoProducto.includes('rod')) {
+        // 3a. Barras de acero rápido (7228.10)
+        if (desc.includes('acero rapido') || obs.includes('acero rapido') || textoGeneral.includes('high-speed steel')) {
+          return { subpartida: '722810', justificacion: justificacion + 'barras de acero rápido.' };
         }
-        if (acabado.includes('forjado')) return { subpartida: '722840', justificacion: justificacion + 'simplemente forjadas.' };
-        if (acabado.includes('frio') || desc.includes('obtenida en frio') || desc.includes('acabada en frio')) { // "simplemente obtenidas o acabadas en frío"
+        // 3b. Barras de acero silicomanganeso (7228.20)
+        if (desc.includes('acero silicomanganeso') || obs.includes('silicomanganeso') || textoGeneral.includes('silico-manganese steel')) {
+          return { subpartida: '722820', justificacion: justificacion + 'barras de acero silicomanganeso.' };
+        }
+
+        // 3c. "Las demás barras" - diferenciadas por proceso/acabado
+        justificacion += 'las demás barras de otros aceros aleados (no acero rápido ni silicomanganeso), ';
+
+        // 7228.40: Simplemente forjadas
+        // ANTERIORMENTE: if (acabado.includes('forjado'))
+        if (desc.includes('forjada') || textoGeneral.includes('forged bar') || textoGeneral.includes('simply forged')) { // <--- CAMBIO AQUÍ
+          return { subpartida: '722840', justificacion: justificacion + 'simplemente forjadas.' };
+        }
+
+        // 7228.30: Simplemente laminadas o extrudidas en caliente (o acabadas en caliente)
+        // ANTERIORMENTE: if (acabado.includes('caliente') || acabado.includes('extrudido'))
+        if (props.procesoLaminado === 'caliente') { // <--- CAMBIO AQUÍ
+          return { subpartida: '722830', justificacion: justificacion + 'simplemente obtenidas/acabadas en caliente (laminadas, estiradas o extrudidas).' };
+        }
+
+        // 7228.50: Simplemente obtenidas o acabadas en frío
+        // ANTERIORMENTE: if (acabado.includes('frio') || desc.includes('obtenida en frio') || desc.includes('acabada en frio'))
+        if (props.procesoLaminado === 'frio') { // <--- CAMBIO AQUÍ
           return { subpartida: '722850', justificacion: justificacion + 'simplemente obtenidas/acabadas en frío.' };
         }
-        // "Las demás" barras (e.g. forjadas y acabadas en frío)
-        return { subpartida: '722860', justificacion: justificacion + 'las demás (e.g. forjadas y trabajadas).' };
+        
+        // 7228.60: Las demás barras (trabajadas posteriormente o proceso no cubierto arriba)
+        return { subpartida: '722860', justificacion: justificacion + 'las demás (e.g., trabajadas posteriormente al simple laminado/forjado/acabado en frío, o proceso no determinado).' };
       }
-      if (tipoProducto.includes('perfil')) return { subpartida: '722870', justificacion: justificacion + 'perfiles.' };
-      if (tipoProducto.includes('barra hueca') && desc.includes('perforacion')) {
-        return { subpartida: '722880', justificacion: 'Barras huecas para perforación (aceros aleados o sin alear).' };
-      }
-      // Fallback si es de la 7228 pero no encaja en lo anterior
-      return { subpartida: '722860', justificacion: justificacion + 'clasificación residual para barras (revisar).' };
+      
+      // Fallback general para la partida 7228 si no encaja en ninguna categoría anterior
+      // (debería ser menos probable si tipoProducto es claro).
+      if (DEBUG) console.warn(`[asignarSubpartidaCap72] Producto en 7228 no clasificable con reglas actuales. Props: ${JSON.stringify(props)}`);
+      return { subpartida: '722860', justificacion: justificacion + 'las demás barras de otros aceros aleados (clasificación residual, revisar información).' };
+
+
+// ... (continuar con el resto de las partidas en el switch) ...
+
+
+
 
 
     case '7229': // Alambre de los demás aceros aleados
