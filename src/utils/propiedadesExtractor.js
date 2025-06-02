@@ -81,7 +81,8 @@ function extraerTodasLasPropiedades(rawText, utils) {
     serie: null,
     formaTransversal: null,
     esEnrollado: false,
-    resistencia: null, // <--- AÑADIDO PARA GUARDAR LÍMITE DE FLUENCIA EN MPA
+    resistencia: null,
+    isPickled: false, // <--- NUEVA PROPIEDAD INICIALIZADA
     // ... otras propiedades que inicialices ...
   };
   const { detectarAcabado, extraerHeatYCoil, extraerMedidasFisicas } = utils;
@@ -93,6 +94,11 @@ function extraerTodasLasPropiedades(rawText, utils) {
   // 1. Descripción del Producto
   let productTypeField = '';
   const productTypeLabelRegex = /(product type\s*\/.*?art des produkts?)\s*[:\-\s]*(see note nr\.?\s*(\d+)|sehen sie anmerkung nr\.?\s*(\d+)|([^\n;,.(]+(?:\s*\(.*?\))?))/i;
+  // --- ATENCIÓN: Esta regex puede necesitar ajuste para tu MTR específico si "PRODUCT TYPE" está en una línea y el valor en la siguiente ---
+  // --- Como en el MTR de Steel Dynamics:
+  // PRODUCT TYPE
+  // Prime Pickled Hot Rolled Sheet
+  // --- Considera una lógica más robusta para capturar `productTypeField` si el log sigue mostrando "Product Type Field no encontrado" ---
   let matchProductTypeLabel = rawText.match(productTypeLabelRegex); 
 
   if (matchProductTypeLabel) {
@@ -106,27 +112,59 @@ function extraerTodasLasPropiedades(rawText, utils) {
       }
   }
   
-  // Fallback para productTypeField si el anterior no encontró nada (para el MTR de AM/NS Calvert)
   if (!productTypeField) {
     const steelGradeRegex = /(?:steel grade\s*\/\s*customer specification|type of product\s*\/\s*surface)\s*[:\-\s]*([^\n;,.(]+)/i;
-    const matchSteelGrade = rawText.match(steelGradeRegex); // Usar rawText para capturar la línea como está
+    const matchSteelGrade = rawText.match(steelGradeRegex); 
     if (matchSteelGrade && matchSteelGrade[1]) {
         productTypeField = matchSteelGrade[1].trim();
         if (DEBUG) console.log(`🕵️ Product Type Field (from Steel Grade/Type of Product Surface): "${productTypeField}"`);
     }
   }
+  
+  // --- INICIO: Lógica MEJORADA para Product Type Field (Ejemplo para MTR de Steel Dynamics) ---
+  // Esta es una sugerencia si la lógica anterior falla consistentemente para ciertos MTRs.
+  // Debes probar y ajustar esta regex para que sea lo suficientemente general o específica.
+  if (!productTypeField) {
+    const productTypeSDRegex = /PRODUCT TYPE\s*\n+\s*([^\n]+)/i; // Busca "PRODUCT TYPE" seguido de nueva(s) línea(s) y captura la siguiente línea.
+    const matchSDProductType = rawText.match(productTypeSDRegex);
+    if (matchSDProductType && matchSDProductType[1]) {
+        productTypeField = matchSDProductType[1].trim();
+        if (DEBUG) console.log(`🕵️ Product Type Field (from SD-like MTR structure): "${productTypeField}"`);
+    }
+  }
+  // --- FIN: Lógica MEJORADA ---
+
 
   if (!productTypeField && DEBUG) console.log(`🕵️ Product Type Field no encontrado con patrón principal o alternativos.`);
-  props.descripcion = productTypeField;
+  props.descripcion = productTypeField; // props.descripcion ahora tendrá el valor (o estará vacía si aún no se encuentra)
   const textoParaTipo = (productTypeField || textoNormalizado).toLowerCase();
 
-  // ... (Lógica para tipoProducto, costura, esEnrollado - SIN CAMBIOS IMPORTANTES)
+
+  // --- INICIO: Lógica para props.isPickled ---
+  // Se ejecuta DESPUÉS de que props.descripcion (productTypeField) haya sido determinada.
+  if (props.descripcion.toLowerCase().includes('pickled') || props.descripcion.toLowerCase().includes('decapado')) {
+    props.isPickled = true;
+  } else {
+    // Fallback: buscar en todo el texto normalizado, pero con más contexto para evitar falsos positivos.
+    // Ejemplo: "pickled" o "decapado" cerca de términos como "hot rolled", "sheet", "coil", "plate".
+    if (textoNormalizado.match(/\b(pickled|decapado)\s+(hot rolled|cold rolled|sheet|plate|coil)\b/i) ||
+        textoNormalizado.match(/\b(hot rolled|cold rolled|sheet|plate|coil)\s+(pickled|decapado)\b/i) ||
+        textoNormalizado.match(/\b(hrp&o|hrpo)\b/i) // Hot Rolled Pickled and Oiled
+       ) {
+      props.isPickled = true;
+    }
+  }
+  if (DEBUG) console.log(`🛠️ Pickled status (props.isPickled): ${props.isPickled}`);
+  // --- FIN: Lógica para props.isPickled ---
+
+
+  // ... (Lógica para tipoProducto, costura, esEnrollado - SIN CAMBIOS IMPORTANTES A MENOS QUE DEPENDAN DE isPickled)
     if (/(tube|pipe|tubo|tubing|piping|conduit)/i.test(textoParaTipo)) {
       props.tipoProducto = 'tubo';
       props.formaFisica = 'cilindrica';
       if (/\bseamless\b|nahtlos/i.test(textoParaTipo)) props.costura = 'sin costura';
       else if (/\b(welded|erw|hfw|saw|geschweisst)\b/i.test(textoParaTipo)) props.costura = 'con costura';
-      else props.costura = 'sin costura';
+      else props.costura = 'sin costura'; // Defaulting to sin costura if not specified as welded
   } else if (/(plate|lamina|sheet|coil|strip|bobina|blech|band)/i.test(textoParaTipo)) {
       props.tipoProducto = 'lamina'; props.formaFisica = 'plana';
       if (/\b(coil|bobina|rollo)\b/i.test(textoParaTipo)) props.esEnrollado = true;
@@ -139,7 +177,6 @@ function extraerTodasLasPropiedades(rawText, utils) {
 
   // 2. Proceso de Manufactura y Tratamiento
   let manufacturingProcessField = "";
-  // ... (lógica para extraer manufacturingProcessField - SIN CAMBIOS IMPORTANTES)
   const mfgProcessLabelRegex = /(manufacturing process\s*\/.*?herstellungsprozess)\s*[:\-\s]*(see note nr\.?\s*(\d+)|sehen sie anmerkung nr\.?\s*(\d+)|([^\n;,.(]+(?:\s*\(.*?\))?))/i;
   const matchMfgProcessLabel = rawText.match(mfgProcessLabelRegex);
    if (matchMfgProcessLabel) {
@@ -154,16 +191,14 @@ function extraerTodasLasPropiedades(rawText, utils) {
   }
   const mfgProcessParaAnalisis = (manufacturingProcessField || "").toLowerCase();
   if (mfgProcessParaAnalisis) {
-    // ... (lógica de tratamiento - SIN CAMBIOS IMPORTANTES)
       if (/\b(normalized and tempered|normalizado y templado|normalgeglueht und anlassen)\b/i.test(mfgProcessParaAnalisis)) props.tratamiento = 'normalizado y templado';
       else if (/\b(normalized|normalizado|normalgeglueht)\b/i.test(mfgProcessParaAnalisis)) props.tratamiento = 'normalizado';
   }
   if (DEBUG && props.tratamiento) console.log(`🔥 Tratamiento: ${props.tratamiento}`);
   props.procesoLaminado = _extraerProcesoLaminado(textoParaTipo, mfgProcessParaAnalisis, textoNormalizado);
-  //  (El log de procesoLaminado explícito ya estaba, se mantiene)
+
 
   // 3. Uso Técnico
-  // ... (lógica de uso técnico - SIN CAMBIOS IMPORTANTES)
   if (props.descripcion && /\b(for boilers|kesselrohre|caldera)\b/i.test(props.descripcion.toLowerCase())) {
       props.usoTecnico = 'termico_caldera';
   }
@@ -171,12 +206,10 @@ function extraerTodasLasPropiedades(rawText, utils) {
     if (/\b(boiler|caldera|heat exchanger|intercambiador de calor|superheater|horno|refinacion|calentador|heater tube)\b/i.test(textoNormalizado)) props.usoTecnico = 'termico_caldera';
     else if (/line\s?pipe|oil country|gas line|oleoducto|gasoducto/i.test(textoNormalizado)) props.usoTecnico = 'oleogas';
     else if (/drill pipe|perforacion petrolera/i.test(textoNormalizado)) props.usoTecnico = 'perforacion';
-    // ... más usos ...
   }
 
 
   // 4. Norma de Producto
-  // ... (lógica de norma - SIN CAMBIOS IMPORTANTES)
   let normaField = "";
   const normLabelRegex = /(standard or specification|norm oder spezifikation)\s*[:\-\s]*(see note nr\.?\s*(\d+)|sehen sie anmerkung nr\.?\s*(\d+)|([^\n;,.(]+(?:\s*;\s*[^\n;,.(]+)*))/i;
   const matchNormLabel = rawText.match(normLabelRegex);
@@ -205,7 +238,6 @@ function extraerTodasLasPropiedades(rawText, utils) {
   const regexNormas = /\b(ASTM\s*[A-Z]\s*\d+(?:\s*\/\s*[A-Z]{1,2}\s*\d+)?M?(?:[\s\-]*GR(?:ADE)?\.?\s*[A-Z\d\.\-]+)?(?:[\s\-]*CL(?:ASS)?\.?\s*\d+)?|ASME\s*S[A-Z]\s*\d+(?:\s*\/\s*S[A-Z]{1,2}\s*\d+)?M?|EN\s*\d+(?:[\s\-:]*[\dTZP]+)?(?:[\s\-]*TC\d)?|DIN\s*(?:EN\s*)?\d+|JIS\s*[A-Z]\s*\d+|API\s*(?:SPEC\s*)?\s*5[LCTDP]+(?:[\s\-]*[A-Z\d]+)?|VDTUV\s*\d+(?:\/\d)?|AD\s*\d*W\d*|NACE\s*MR\d+)\b/gi;
   let matchNormIterator;
   while ((matchNormIterator = regexNormas.exec(textoParaNorma)) !== null) {
-      // ... (lógica de prioridad de normas) ...
       let normaPotencial = matchNormIterator[0].replace(/\s+/g, ' ').trim().toUpperCase();
       if (normaPotencial.startsWith("EN 10204")) continue;
       let prioridad = 2;
@@ -225,7 +257,6 @@ function extraerTodasLasPropiedades(rawText, utils) {
       props.usoTecnico = 'conduccion_baja_temp';
   }
   if(DEBUG) console.log(`📜 Norma(s) Detectada(s): ${props.norma} ${props.normaTecnica ? `| Tecnica: ${props.normaTecnica}` : ''}`);
-  // (El log de usoTecnico ya estaba, se mantiene)
 
 
   // 5. Medidas Físicas
@@ -234,7 +265,7 @@ function extraerTodasLasPropiedades(rawText, utils) {
   // 6. Recubrimiento
   let surfaceField = "";
   const typeProductSurfaceRegex = /(?:type of product\s*\/[^\n]+surface|product\/surface|product and surface finish|product description\s*-\s*finish)\s*[:\-\s]*(see note nr\.?\s*(\d+)|([^\n;,.(]+(?:\s*\(.*?\))?))/i;
-  matchTypeProductSurface = rawText.match(typeProductSurfaceRegex); // Re-usar variable, ya estaba declarada arriba
+  let matchTypeProductSurface = rawText.match(typeProductSurfaceRegex);
   if (matchTypeProductSurface) {
       if (matchTypeProductSurface[2]) {
           const noteNumber = matchTypeProductSurface[2];
@@ -268,66 +299,67 @@ function extraerTodasLasPropiedades(rawText, utils) {
     props.recubrimiento = 'galvanizado_inmersion';
   } else if (/\b(galvanize[d]?|galvanizado|zincado|gi|ga|zf)\b/i.test(textoParaRecubrimiento)) {
     props.recubrimiento = 'galvanizado'; 
-  } // ... más else if para otros recubrimientos ...
+  } 
   else if (/\b(bare|uncoated|sin recubrimiento|self color|roh|int bare)\b/i.test(textoParaRecubrimiento)) {
     props.recubrimiento = 'sin recubrimiento';
   }
 
-  if (!props.recubrimiento) { // Fallback más agresivo usando textoNormalizado completo
-      const textoFallbackRec = textoNormalizado; // Usar el texto completo OCRizado
+  if (!props.recubrimiento) { 
+      const textoFallbackRec = textoNormalizado; 
       if (/\b(galvanize|galvanizado)\b/i.test(textoFallbackRec)) {
           if (/\b(egl|electro)\b/i.test(textoFallbackRec) && !/\b(non chem treat|quaker ferrocote\s+egl)\b/i.test(textoFallbackRec)) { 
-            // ^-- Condición ajustada: si dice EGL pero también "Non Chem Treat Quaker Ferrocote EGL", no es necesariamente electro.
-            // Para el MTR de Calvert, "Quaker Ferrocote EGL-1" está en la descripción "Type of Product/Surface: Galvanize Non Chem Treat... EGL-1"
-            // Esta línea del MTR: "Galvanize Non Chem Treat, 1.0 g/m2 Quaker Ferrocote EGL-1"
-            // Si "EGL" se encuentra aquí y no hay "electro" explícito, priorizamos las otras pistas como "60G/60G".
-            // Si el `surfaceField` capturó "Galvanize Non Chem Treat, 1.0 g/m2 Quaker Ferrocote EGL-1",
-            // y `textoParaRecubrimiento` lo contiene, la regex `/\b(electro...|quaker ferrocote egl)\b/i` podría activarse.
-            // La clave es si "quaker ferrocote egl" implica electrolítico. Si no estás seguro, es mejor no asignarlo.
           }
-          // La lógica para "60G/60G" ya está arriba y debería haberlo capturado como inmersion.
-          // Si llegó hasta aquí y aún es "galvanize", entonces 'galvanizado' genérico es lo más seguro.
           if (!props.recubrimiento) props.recubrimiento = 'galvanizado';
       }
   }
-  if (!props.recubrimiento) props.recubrimiento = 'sin recubrimiento';
+  // If props.isPickled is true and it's some form of hot-rolled, recubrimiento should remain 'sin recubrimiento'
+  // unless an actual metallic coating is also specified. "Pickled" itself is not a "recubrimiento" for tariff.
+  if (props.isPickled && !props.recubrimiento) {
+      props.recubrimiento = 'sin recubrimiento';
+  } else if (!props.recubrimiento) {
+      props.recubrimiento = 'sin recubrimiento';
+  }
   if(DEBUG && props.recubrimiento) console.log(`✨ Recubrimiento (final): ${props.recubrimiento}`);
 
 
   // 7. Acabado y Refinamiento de Proceso Laminado
-  // ... (lógica de acabado - SIN CAMBIOS IMPORTANTES) ...
-  let acabadoDetectado = detectarAcabado(textoNormalizado, props);
+  let acabadoDetectado = detectarAcabado(textoNormalizado, props); // `props` is passed but not used by `detectarAcabado` as per its definition
   if (DEBUG && acabadoDetectado) console.log(`💅 Acabado (de detectarAcabado): ${acabadoDetectado}`);
-  if (props.procesoLaminado === 'caliente') {
-    if (props.tratamiento) { props.acabado = props.tratamiento; }
-    else if (acabadoDetectado && typeof acabadoDetectado === 'string' && !acabadoDetectado.toLowerCase().includes('frio')) { props.acabado = acabadoDetectado; }
-    else { props.acabado = 'laminado en caliente'; }
+  
+  // Prioritize "pickled" or "decapado" in acabado if props.isPickled is true,
+  // especially for hot-rolled products, otherwise use standard logic.
+  if (props.isPickled && props.procesoLaminado === 'caliente') {
+      props.acabado = 'decapado'; // Or 'pickled' if you prefer that term consistently
+  } else if (props.procesoLaminado === 'caliente') {
+    if (props.tratamiento) { 
+        props.acabado = props.tratamiento; 
+    } else if (acabadoDetectado && typeof acabadoDetectado === 'string' && !acabadoDetectado.toLowerCase().includes('frio')) { 
+        props.acabado = acabadoDetectado; 
+    } else { 
+        props.acabado = 'laminado en caliente'; 
+    }
   } else if (props.procesoLaminado === 'frio') {
-    props.acabado = acabadoDetectado || 'laminado en frio';
+    props.acabado = acabadoDetectado && acabadoDetectado !== '-' ? acabadoDetectado : 'laminado en frio';
   } else { 
-    props.acabado = acabadoDetectado;
+    props.acabado = acabadoDetectado && acabadoDetectado !== '-' ? acabadoDetectado : null; // Set to null if no process and no specific finish detected
     if (!props.procesoLaminado && props.acabado && typeof props.acabado === 'string') {
       if (props.acabado.toLowerCase().includes('frio') || props.acabado.toLowerCase().includes('cold')) props.procesoLaminado = 'frio';
       else if (props.acabado.toLowerCase().includes('caliente') || props.acabado.toLowerCase().includes('hot')) props.procesoLaminado = 'caliente';
     }
   }
   if (DEBUG && props.acabado) console.log(`💅 Acabado (final): ${props.acabado}`);
-  // (El log de procesoLaminado final ya estaba, se mantiene)
 
 
   // --- INICIO DE LA SECCIÓN DE PROPIEDADES MECÁNICAS (Yield Strength / Resistencia) ---
   const seccionPruebaExtensionMatch = textoNormalizado.match(/tensile test[\s\S]*?(?=chemical composition|mill certificate|this is not a nafta|page\s\d+\s*of\s*\d+|$)/i);
   if (seccionPruebaExtensionMatch && seccionPruebaExtensionMatch[0]) {
-      const textoPruebaExtension = seccionPruebaExtensionMatch[0]; // Ya está en minúsculas por textoNormalizado
+      const textoPruebaExtension = seccionPruebaExtensionMatch[0]; 
       if (DEBUG) console.log(`💪 Texto para Pruebas de Tensión: "${textoPruebaExtension.substring(0,150)}..."`);
 
-      // Regex ajustada para el formato OCR: "l 669ksi 82ksi 28 0.47"
-      // Busca "yield strength" o similar, y luego la línea con valores L/T valorUnidad valorUnidad valor
       const matchEncabezadoValores = textoPruebaExtension.match(/(?:yield\s*strength.*?)(l|t)\s+(\d+\.?\d*)\s*(ksi|mpa|psi|n\/mm2)\s+(\d+\.?\d*)\s*(ksi|mpa|psi|n\/mm2)\s+(\d+\.?\d*)/i);
       let matchValoresDirectos = null;
 
-      if (!matchEncabezadoValores) { // Si no encuentra el encabezado "yield strength" seguido de la línea L/T...
-          // Intentar buscar directamente la línea de valores L/T si la estructura es consistente
+      if (!matchEncabezadoValores) { 
           matchValoresDirectos = textoPruebaExtension.match(/\b(l|t)\s+(\d+\.?\d*)\s*(ksi|mpa|psi|n\/mm2)\s+(\d+\.?\d*)\s*(ksi|mpa|psi|n\/mm2)\s+(\d+\.?\d*)/i);
           if (DEBUG && matchValoresDirectos) console.log("💪 Match directo para valores de tensión (sin encabezado yield explícito):", matchValoresDirectos);
       }
@@ -351,24 +383,23 @@ function extraerTodasLasPropiedades(rawText, utils) {
               fluenciaEnMPa = valorFluencia;
           }
           
-          props.resistencia = fluenciaEnMPa; // Asignar a props.resistencia
+          props.resistencia = fluenciaEnMPa; 
 
-          if (DEBUG && props.resistencia !== undefined) console.log(`💪 Resistencia (Límite de Fluencia) Convertida: ${props.resistencia} MPa`);
+          if (DEBUG && props.resistencia !== undefined && props.resistencia !== null) console.log(`💪 Resistencia (Límite de Fluencia) Convertida: ${props.resistencia} MPa`);
 
       } else if (DEBUG) {
           console.log("💪 Límite de Fluencia (y otros datos de tensión) no encontrado con las regex para TENSILE TEST.");
-          // Fallback a la regex original si las nuevas no funcionan (por si el OCR varía)
           const matchFluenciaFallback = textoPruebaExtension.match(/(?:yield\s*strength|limite\s*de\s*fluencia|proof\s*strength\s*rp0\.2)\s*[^0-9.]*(\d+\.?\d*)\s*(ksi|mpa|psi|n\/mm2)/i);
           if (matchFluenciaFallback) {
                const valorFluenciaFallback = parseFloat(matchFluenciaFallback[1]);
                const unidadFluenciaFallback = matchFluenciaFallback[2].toLowerCase();
                if (DEBUG) console.log(`💪 Límite de Fluencia (Fallback) Detectado: ${valorFluenciaFallback} ${unidadFluenciaFallback}`);
-               // ... (lógica de conversión para fallback)
                 let fluenciaEnMPaFallback = null;
                 if (unidadFluenciaFallback === 'ksi') fluenciaEnMPaFallback = parseFloat((valorFluenciaFallback * 6.89476).toFixed(2));
-                // ... otros ...
+                else if (unidadFluenciaFallback === 'psi') fluenciaEnMPaFallback = parseFloat((valorFluenciaFallback * 0.00689476).toFixed(2));
+                else if (unidadFluenciaFallback === 'mpa' || unidadFluenciaFallback === 'n/mm2') fluenciaEnMPaFallback = valorFluenciaFallback;
                 props.resistencia = fluenciaEnMPaFallback;
-                if (DEBUG && props.resistencia !== undefined) console.log(`💪 Resistencia (Fallback) Convertida: ${props.resistencia} MPa`);
+                if (DEBUG && props.resistencia !== undefined && props.resistencia !== null) console.log(`💪 Resistencia (Fallback) Convertida: ${props.resistencia} MPa`);
            } else if (DEBUG) {
                console.log("💪 Límite de Fluencia no encontrado con ninguna regex en TENSILE TEST.");
            }
@@ -376,11 +407,9 @@ function extraerTodasLasPropiedades(rawText, utils) {
   } else if (DEBUG) {
       console.log("💪 Sección de Pruebas de Tensión no encontrada.");
   }
-  // --- FIN DE LA SECCIÓN DE PROPIEDADES MECÁNICAS ---
 
 
   // 8. Molino
-  // ... (lógica de molino - SIN CAMBIOS IMPORTANTES) ...
   let molinoDetectadoLocal = null;
   const molinoFieldRegex = /(?:mill|manufacturer|plant|werk|hersteller)\s*[:\-\s]*([^\n,;(\bsee\b)]+)/i;
   const molinoFieldMatchLocal = textoNormalizado.match(molinoFieldRegex);
@@ -398,20 +427,15 @@ function extraerTodasLasPropiedades(rawText, utils) {
    if (!molinoDetectadoLocal && textoNormalizado.includes("tenaris")) molinoDetectadoLocal = "TENARIS";
 
   if (molinoDetectadoLocal) {
-    // ... (lógica de asignación de molino)
       if (molinoDetectadoLocal.includes("SILCOTUB S.A. PLANT") || molinoDetectadoLocal === "SILCOTUB") props.molino = "TENARIS - SILCOTUB";
       else if (molinoDetectadoLocal.includes("DALMINE")) props.molino = "TENARIS - DALMINE";
-      // ...
       else { props.molino = molinoDetectadoLocal; }
-  } else {
-    // ... (lógica de fallback para molino)
-  }
+  } 
   if (DEBUG && props.molino) console.log(`🏭 Molino Detectado: ${props.molino}`);
   else if (DEBUG) console.log(`🏭 Molino no detectado.`);
   
 
   // 9. Serie Inox
-  // ... (lógica de serie inox - SIN CAMBIOS IMPORTANTES) ...
   const matchSerieInox = textoParaTipo.match(/\b(2\d{2}|3\d{2}[a-z]?|4\d{2}[a-z]?)\b/i);
   if (matchSerieInox && matchSerieInox[1]) {
       if (textoParaTipo.includes('stainless') || textoParaTipo.includes('inox') || textoParaTipo.match(/aisi\s*(2\d{2}|3\d{2}|4\d{2})/i)) {
@@ -421,7 +445,6 @@ function extraerTodasLasPropiedades(rawText, utils) {
   if(DEBUG && props.serie) console.log(`🕵️ Serie Inox (preliminar): ${props.serie}`);
 
   // 10. Forma Transversal
-  // ... (lógica de forma transversal - SIN CAMBIOS IMPORTANTES) ...
    if (!props.formaTransversal) {
       if (props.tipoProducto === 'tubo') {
           if (textoNormalizado.includes('round tube') || textoNormalizado.includes('tubo redondo') || props.formaFisica === 'cilindrica') props.formaTransversal = 'circular';
@@ -431,7 +454,6 @@ function extraerTodasLasPropiedades(rawText, utils) {
 
 
   if (DEBUG) {
-    // Esta es la línea que antes daba error como 494
     console.log("📦 Propiedades Analizadas (final de extraerTodasLasPropiedades):", JSON.stringify(props, null, 2));
   }
   return props;
