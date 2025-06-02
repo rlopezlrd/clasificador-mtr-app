@@ -178,6 +178,11 @@ function determinarNICO_Cap72(fraccion, props) {
     if (espesor <= 4.75 && !decapado) return '03';
     return '99';
   }
+
+
+
+
+  
   if (fraccion === '72082502') { // Enrollados, decapados, espesor >= 4.75mm
     // NICO 01: De espesor superior a 10 mm.
     // NICO 99: Los demás (4.75mm <= espesor <= 10mm)
@@ -690,36 +695,176 @@ function determinarNICO_Cap72(fraccion, props) {
   }
 
   // Laminados planos, otros aceros aleados, >=600mm - Partida 72.25
-  if (fraccion.startsWith('72251')) return defaultNICO; // Acero al silicio (magnético)
-  // Los siguientes tienen NICOs complejos basados en Boro, espesor, uso (herramienta, rápido), decapado, enrollado.
-  // Estos requerirían lógica muy detallada similar a la tarifa.
-  if (fraccion === '72253091' || fraccion === '72254091' || fraccion === '72255091') {
-    // Ejemplo simplificado para 7225.50.91 (Los demás, frío)
-    // NICO 08: De acero rápido.
-    // NICO 09: De acero grado herramienta.
-    // NICO 11: De alta resistencia (límite elástico >= 355 MPa).
-    if (texto.includes('acero rapido')) return '08';
-    if (texto.includes('grado herramienta')) return '09';
-    if (resistencia >= 355 || texto.includes('alta resistencia')) return '11';
-    return '99'; // Fallback
+ // Dentro de asignarSubpartidaCap72.js -> función determinarSubpartida(props, partida)
+
+if (fraccion === '72251102') return '01';
+if (fraccion.startsWith('72251')) return defaultNICO; // '00' para 72251101, 72251999, etc.
+
+
+ 
+  
+if (fraccion === '72253091') {
+    const boro = props.composicion?.boro || 0; // Ejemplo: 0.0002 para 0.0002%
+    const espesor = props.espesor || 0;
+    const esDecapado = props.isPickled;
+    const esAceroRapido = (props.descripcion + " " + props.observaciones).toLowerCase().includes('acero rapido');
+    const esGradoHerramienta = (props.descripcion + " " + props.observaciones).toLowerCase().includes('grado herramienta');
+
+    if (boro >= 0.0008) { // Contenido de Boro ALTO
+        if (!esAceroRapido && esGradoHerramienta) { /* Podría ser NICO 06 si aplica aquí o se maneja después */ }
+        // Solo si el boro es ALTO, se evalúan 01-04 basados en espesor (y que no sea NICO 06)
+        if (espesor > 10 && !(esGradoHerramienta && !esAceroRapido)) return '01';
+        if (espesor >= 4.75 && espesor <= 10 && !(esGradoHerramienta && !esAceroRapido)) return '02';
+        if (espesor >= 3 && espesor < 4.75 && !(esGradoHerramienta && !esAceroRapido)) return '03';
+        if (espesor < 3 && !(esGradoHerramienta && !esAceroRapido)) return '04'; // El sistema está llegando aquí incorrectamente
+    }
+
+    // Si el boro es BAJO o las condiciones anteriores no se cumplieron:
+    if (esAceroRapido) return '05';
+    if (esGradoHerramienta && !esAceroRapido) return '06';
+
+    if (esDecapado) {
+        // NICO 07: esDecapado Y boro >= 0.0008% (ya se habría cubierto arriba si boro fuera alto)
+        // Por lo tanto, si llegamos aquí y esDecapado es true, el boro es bajo.
+        if (boro >= 0.0008) return '07'; // Esta condición sería falsa aquí si la lógica anterior es correcta
+
+        // NICO 08: esDecapado, espesor >= 4.75mm, Y NO NICO 07 (o sea, boro < 0.0008%)
+        if (espesor >= 4.75) return '08'; 
+
+        return '91'; // Los demás decapados (boro bajo, y espesor no cumple para 08)
+    }
+
+    // Si NO es decapado y no es 01-06:
+    if (espesor < 4.75) return '92';
+
+    return '99'; // Los demás
+}
+
+// Dentro de tu función determinarNICO_Cap72(fraccion, props)
+
+if (fraccion === '72254091') {
+  const boro = props.composicion?.boro || 0; // Ejemplo: 0.0002 para 0.0002%
+  const espesor = props.espesor || 0; // en mm
+  const texto = `${props.descripcion || ''} ${props.usoTecnico || ''} ${props.observaciones || ''}`
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  
+  // Para "Acero de alta resistencia", la definición puede variar.
+  // Usaremos una combinación de props.resistencia (si la tienes en MPa) y búsqueda de texto.
+  // Asumimos que props.resistencia es el límite de fluencia o tracción en MPa.
+  // El umbral de 355 MPa es común para "alta resistencia", pero ajústalo si es necesario.
+  const esAltaResistencia = (props.resistencia && props.resistencia >= 355) || texto.includes('alta resistencia');
+
+  const esAceroRapido = texto.includes('acero rapido') || texto.includes('high-speed steel');
+  const esGradoHerramienta = texto.includes('grado herramienta') || texto.includes('tool steel');
+  const esParaTubosOleoductos = texto.includes('para fabricacion de tubos') || texto.includes('oleoducto') || texto.includes('gasoducto');
+
+  // NICO 05: Acero rápido.
+  if (esAceroRapido) return '05';
+
+  // NICO 07: Acero de grado herramienta.
+  // Es importante verificar esto antes de los NICOs 01-04 debido a la cláusula "excepto de grado herramienta".
+  if (esGradoHerramienta) return '07';
+
+  // NICOs 01-04: Basados en Boro y espesor (y NO siendo grado herramienta)
+  if (boro >= 0.0008) { // Contenido de Boro igual o superior a 0.0008%
+    if (espesor > 10) return '01'; // NICO 01
+    if (espesor >= 4.75 && espesor <= 10) return '02'; // NICO 02
+    if (espesor >= 3 && espesor < 4.75) return '03'; // NICO 03
+    if (espesor < 3) return '04'; // NICO 04
   }
-  if (fraccion === '72259101') return defaultNICO; // Cincados electrolíticamente
-  if (fraccion === '72259201') { // Cincados de otro modo
-    // NICO 01: De alta resistencia (límite elástico >= 355 MPa).
-    // NICO 99: Los demás.
-    if (resistencia >= 355 || texto.includes('alta resistencia')) return '01';
-    return '99';
+
+  // NICO 06: Acero de alta resistencia.
+  if (esAltaResistencia) return '06';
+
+  // NICO 08: Acero para la fabricacion de tubos de los tipos utilizados en oleoductos o gasoductos.
+  if (esParaTubosOleoductos) return '08';
+
+  // NICO 91: Los demas de espesor inferior a 4.75 mm.
+  // (Si no cumplió ninguna de las condiciones anteriores Y el espesor es < 4.75mm)
+  if (espesor < 4.75) return '91';
+  
+  // NICO 99: Los demas.
+  return '99';
+}
+
+// Dentro de tu función determinarNICO_Cap72(fraccion, props)
+
+if (fraccion === '72255091') {
+  const boro = props.composicion?.boro || 0; // Ejemplo: 0.0002 para 0.0002%
+  const espesor = props.espesor || 0; // en mm
+  const esEnrollado = props.esEnrollado === true; // Asegurarse de que sea un booleano explícito
+  const texto = `${props.descripcion || ''} ${props.usoTecnico || ''} ${props.observaciones || ''}`
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+  const esAceroRapido = texto.includes('acero rapido') || texto.includes('high-speed steel');
+  const esGradoHerramienta = texto.includes('grado herramienta') || texto.includes('tool steel');
+  const esParaPorcelanizar = texto.includes('para porcelanizar') || texto.includes('for porcelain enameling'); // Ajustar keywords según sea necesario
+  
+  // Asumimos que props.resistencia es el límite de fluencia o tracción en MPa.
+  // El umbral de 355 MPa es común para "alta resistencia", pero ajústalo si es necesario.
+  const esAltaResistencia = (props.resistencia && props.resistencia >= 355) || texto.includes('alta resistencia');
+
+  // NICO 08: De acero rápido.
+  if (esAceroRapido) return '08';
+
+  // NICO 09: De acero grado herramienta.
+  // Se verifica antes de los NICOs 01-07 por la cláusula "excepto de acero grado herramienta".
+  if (esGradoHerramienta) return '09';
+
+  // Si NO es Acero Rápido NI Grado Herramienta, entonces se evalúan los NICOs 01-07 basados en Boro, espesor y si está enrollado.
+  if (boro >= 0.0008) { // Contenido de Boro igual o superior a 0.0008%
+    if (esEnrollado) { // ENROLLADA
+      if (espesor > 1 && espesor < 3) return '01';    // NICO 01
+      if (espesor >= 0.5 && espesor <= 1) return '02'; // NICO 02
+      if (espesor < 0.5) return '03';                 // NICO 03
+      if (espesor >= 3) return '04';                  // NICO 04 (Según la imagen, este es >= 3mm, podría haber un límite superior implícito o es el más grueso de los enrollados con boro)
+      if (espesor >= 4.75) return '05';               // NICO 05
+      // Nota: La lógica de espesor para 04 y 05 (ambos enrollados con boro) necesita ser clara.
+      // La imagen para 04 dice "superior o igual a 3 mm" y para 05 dice "superior o igual a 4.75mm".
+      // Si es >= 4.75mm, cumple para 05. Si es >=3mm pero <4.75mm, cumpliría para 04.
+      // El orden de arriba (01,02,03, luego 04, luego 05) podría necesitar ajuste si hay superposición.
+      // Una forma más segura si las condiciones de espesor son rangos exactos:
+      // if (espesor > 1 && espesor < 3) return '01';
+      // if (espesor >= 0.5 && espesor <= 1) return '02';
+      // if (espesor < 0.5) return '03';
+      // if (espesor >= 4.75) return '05'; // NICO 05 (más específico por espesor mayor)
+      // if (espesor >= 3 && espesor < 4.75) return '04'; // NICO 04 (rango restante)
+
+    } else { // SIN ENROLLAR
+      if (espesor < 4.75) return '06';                 // NICO 06
+      if (espesor >= 4.75) return '07';                // NICO 07
+    }
   }
-  if (fraccion === '72259999') { // Los demás (revestidos)
-    // NICO 01: Aluminizados.
-    // NICO 02: Pintados, barnizados o revestidos de plástico.
-    // NICO 03: Revestidos con aleaciones de aluminio y cinc (Galvalume).
-    // NICO 99: Los demás.
-    if (props.recubrimiento?.toLowerCase().includes('aluminizado') || props.recubrimiento?.toLowerCase().includes('aluminio')) return '01';
-    if (props.recubrimiento?.toLowerCase().includes('pintado') || props.recubrimiento?.toLowerCase().includes('barnizado') || props.recubrimiento?.toLowerCase().includes('plastico')) return '02';
-    if (props.recubrimiento?.toLowerCase().includes('aluminio-zinc') || props.recubrimiento?.toLowerCase().includes('galvalume')) return '03';
-    return '99';
+
+  // Si no es Acero Rápido, ni Grado Herramienta, y no cumplió las condiciones de Boro (01-07):
+  // NICO 10: De acero para porcelanizar, de espesor superior o igual a 4.75 mm.
+  if (esParaPorcelanizar) {
+    if (espesor >= 4.75) return '10';
+    // NICO 92: Los demas de acero para porcelanizar. (Implica < 4.75mm si NICO 10 es para >=4.75mm)
+    return '92'; 
   }
+
+  // NICO 11: De acero de alta resistencia.
+  if (esAltaResistencia) return '11';
+
+  // NICO 91: Los demas de espesor superior o igual a 4.75 mm.
+  // (No es rápido, ni herramienta, ni boro alto, ni porcelanizar, ni alta resistencia)
+  if (espesor >= 4.75) return '91';
+  
+  // NICO 99: Los demas.
+  // (Cubre, por ejemplo, los de espesor < 4.75 mm que no son para porcelanizar ni de alta resistencia, etc.)
+  return '99';
+}
+
+
+
+
+// ... continuar con la lógica para otras fracciones ...
+
 
 
   // Laminados planos, otros aceros aleados, <600mm - Partida 72.26
