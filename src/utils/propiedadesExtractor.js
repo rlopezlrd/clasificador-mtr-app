@@ -93,7 +93,9 @@ function extraerTodasLasPropiedades(rawText, utils) {
 
   // 1. Descripción del Producto
   let productTypeField = '';
-  const productTypeLabelRegex = /(product type\s*\/.*?art des produkts?)\s*[:\-\s]*(see note nr\.?\s*(\d+)|sehen sie anmerkung nr\.?\s*(\d+)|([^\n;,.(]+(?:\s*\(.*?\))?))/i;
+  //const productTypeLabelRegex = /(product type\s*\/.*?art des produkts?)\s*[:\-\s]*(see note nr\.?\s*(\d+)|sehen sie anmerkung nr\.?\s*(\d+)|([^\n;,.(]+(?:\s*\(.*?\))?))/i;
+  const productTypeLabelRegex = /(product type\s*\/.*?art des produkts?|Product Desc\.)\s*[:\-\s]*(see note nr\.?\s*(\d+)|sehen sie anmerkung nr\.?\s*(\d+)|([^\n;,.(]+(?:\s*\(.*?\))?))/i;
+  
   // --- ATENCIÓN: Esta regex puede necesitar ajuste para tu MTR específico si "PRODUCT TYPE" está en una línea y el valor en la siguiente ---
   // --- Como en el MTR de Steel Dynamics:
   // PRODUCT TYPE
@@ -211,7 +213,9 @@ function extraerTodasLasPropiedades(rawText, utils) {
 
   // 4. Norma de Producto
   let normaField = "";
-  const normLabelRegex = /(standard or specification|norm oder spezifikation)\s*[:\-\s]*(see note nr\.?\s*(\d+)|sehen sie anmerkung nr\.?\s*(\d+)|([^\n;,.(]+(?:\s*;\s*[^\n;,.(]+)*))/i;
+  //const normLabelRegex = /(standard or specification|norm oder spezifikation)\s*[:\-\s]*(see note nr\.?\s*(\d+)|sehen sie anmerkung nr\.?\s*(\d+)|([^\n;,.(]+(?:\s*;\s*[^\n;,.(]+)*))/i;
+  const normLabelRegex = /(standard or specification|norm oder spezifikation|Material Spec\.)\s*[:\-\s]*(see note nr\.?\s*(\d+)|sehen sie anmerkung nr\.?\s*(\d+)|([^\n;,.(]+(?:\s*;\s*[^\n;,.(]+)*))/i;
+  
   const matchNormLabel = rawText.match(normLabelRegex);
   let notaNormaUsada = false;
   if (matchNormLabel) {
@@ -293,11 +297,19 @@ function extraerTodasLasPropiedades(rawText, utils) {
   props.recubrimiento = null; 
   if (/\b(electro[- ]?galvanized|electrozincado|electro-?zinc|eg|eg-coat(?:ed)?)\b/i.test(textoParaRecubrimiento)) {
     props.recubrimiento = 'galvanizado_electrolitico';
-  } else if ((/\b(hot[- ]?dip|inmersi[oó]n|a653)\b/i.test(textoParaRecubrimiento) && /\b(galvanize[d]?|galvanizado|zincado|gi|ga|zf)\b/i.test(textoParaRecubrimiento)) || 
-             (/\b(galvanize[d]?|galvanizado|zincado|gi|ga|zf)\b/i.test(textoParaRecubrimiento) && /\b(60g\/60g|g60|g90)\b/i.test(textoParaRecubrimiento)) ||
-             /\bz\d{2,3}\b/i.test(textoParaRecubrimiento) ) {
-    props.recubrimiento = 'galvanizado_inmersion';
-  } else if (/\b(galvanize[d]?|galvanizado|zincado|gi|ga|zf)\b/i.test(textoParaRecubrimiento)) {
+
+//   } else if ((/\b(hot[- ]?dip|inmersi[oó]n|a653)\b/i.test(textoParaRecubrimiento) && /\b(galvanize[d]?|galvanizado|zincado|gi|ga|zf)\b/i.test(textoParaRecubrimiento)) || 
+//              (/\b(galvanize[d]?|galvanizado|zincado|gi|ga|zf)\b/i.test(textoParaRecubrimiento) && /\b(60g\/60g|g60|g90)\b/i.test(textoParaRecubrimiento)) ||
+//              /\bz\d{2,3}\b/i.test(textoParaRecubrimiento) ) {
+//     props.recubrimiento = 'galvanizado_inmersion';
+//   } else if (/\b(galvanize[d]?|galvanizado|zincado|gi|ga|zf)\b/i.test(textoParaRecubrimiento)) {
+    } else if ((/\b(hot[- ]?dip|inmersi[oó]n|a653)\b/i.test(textoParaRecubrimiento) && /\b(galv(anize[d]?)?|galvanizado|zincado|gi|ga|zf)\b/i.test(textoParaRecubrimiento)) || 
+           (/\b(galv(anize[d]?)?|galvanizado|zincado|gi|ga|zf)\b/i.test(textoParaRecubrimiento) && /\b(60g\/60g|g60|g90)\b/i.test(textoParaRecubrimiento)) ||
+           /\bz\d{2,3}\b/i.test(textoParaRecubrimiento) ) {
+  props.recubrimiento = 'galvanizado_inmersion';
+} else if (/\b(galv(anize[d]?)?|galvanizado|zincado|gi|ga|zf)\b/i.test(textoParaRecubrimiento)) {
+
+
     props.recubrimiento = 'galvanizado'; 
   } 
   else if (/\b(bare|uncoated|sin recubrimiento|self color|roh|int bare)\b/i.test(textoParaRecubrimiento)) {
